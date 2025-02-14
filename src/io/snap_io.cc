@@ -146,7 +146,7 @@ void snap_io::init_basic(simparticles *Sp_ptr)
 #endif
 
 #ifdef OUTPUT_ENTROPY
-  init_field("ENTR", "Entropy", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, READ_IF_PRESENT, 1, A_SPHP, &Sp->SphP[0].Entropy, 0,
+  init_field("ENTR", "Entropy", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, SKIP_ON_READ, 1, A_SPHP, &Sp->SphP[0].Entropy, 0,
              GAS_ONLY, /* particle entropy */
              0, 0, 0, 0, 0, 0, 0);
 #endif
