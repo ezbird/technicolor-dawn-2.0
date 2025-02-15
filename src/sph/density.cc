@@ -595,7 +595,7 @@ void sph::density(int *list, int ntarget)
                     }
 
                   if(Right[target] > 0 && Left[target] > 0)
-                    SphP[target].Hsml = pow(0.5 * (pow(Left[target], 3) + pow(Right[target], 3)), 1.0 / 3);
+                    SphP[target].Hsml = pow(0.5 * (pow(Left[target], NUMDIMS) + pow(Right[target], NUMDIMS)), 1.0 / NUMDIMS);
                   else
                     {
                       if(Right[target] == 0 && Left[target] == 0)
