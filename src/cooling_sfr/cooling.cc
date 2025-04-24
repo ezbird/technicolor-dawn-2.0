@@ -43,31 +43,44 @@
  *   \param ne_guess electron number density relative to hydrogen number density (for molecular weight computation)
  *   \return the new internal energy per unit mass of the gas particle
  */
-double coolsfr::DoCooling(double u_old, double rho, double dt, double *ne_guess, gas_state *gs, do_cool_data *DoCool)
-{
-  DoCool->u_old_input    = u_old;
-  DoCool->rho_input      = rho;
-  DoCool->dt_input       = dt;
-  DoCool->ne_guess_input = *ne_guess;
-
-  if(!gsl_finite(u_old))
-    Terminate("invalid input: u_old=%g\n", u_old);
-
-  if(u_old < 0 || rho < 0)
-    Terminate("invalid input: u_old=%g  rho=%g  dt=%g  All.MinEgySpec=%g\n", u_old, rho, dt, All.MinEgySpec);
-
-  rho *= All.UnitDensity_in_cgs * All.HubbleParam * All.HubbleParam; /* convert to physical cgs units */
-  u_old *= All.UnitPressure_in_cgs / All.UnitDensity_in_cgs;
-  dt *= All.UnitTime_in_s / All.HubbleParam;
-
-  gs->nHcgs       = gs->XH * rho / PROTONMASS; /* hydrogen number dens in cgs units */
-  double ratefact = gs->nHcgs * gs->nHcgs / rho;
-
-  double u       = u_old;
-  double u_lower = u;
-  double u_upper = u;
-
-  double LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, DoCool);
+ double coolsfr::DoCooling(double u_old, double rho, double dt, double *ne_guess, gas_state *gs, do_cool_data *DoCool)
+ {
+   // Save inputs for diagnostic
+   double u_input = u_old;
+   
+   DoCool->u_old_input    = u_old;
+   DoCool->rho_input      = rho;
+   DoCool->dt_input       = dt;
+   DoCool->ne_guess_input = *ne_guess;
+ 
+   if(!gsl_finite(u_old))
+     Terminate("invalid input: u_old=%g\n", u_old);
+ 
+   if(u_old < 0 || rho < 0)
+     Terminate("invalid input: u_old=%g  rho=%g  dt=%g  All.MinEgySpec=%g\n", u_old, rho, dt, All.MinEgySpec);
+ 
+   rho *= All.UnitDensity_in_cgs * All.HubbleParam * All.HubbleParam; /* convert to physical cgs units */
+   u_old *= All.UnitPressure_in_cgs / All.UnitDensity_in_cgs;
+   dt *= All.UnitTime_in_s / All.HubbleParam;
+ 
+   gs->nHcgs       = gs->XH * rho / PROTONMASS; /* hydrogen number dens in cgs units */
+   double ratefact = gs->nHcgs * gs->nHcgs / rho;
+ 
+   double u       = u_old;
+   double u_lower = u;
+   double u_upper = u;
+ 
+   double LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, DoCool);
+   
+   // Debug: check if we're heating or cooling
+   if(LambdaNet > 0) {
+     mpi_printf("DOCOOLING: HEATING detected - LambdaNet=%g for u=%g rho=%g\n", 
+               LambdaNet, u_input, DoCool->rho_input);
+   }
+   else {
+     mpi_printf("DOCOOLING: COOLING detected - LambdaNet=%g for u=%g rho=%g\n", 
+               LambdaNet, u_input, DoCool->rho_input);
+   }
 
   /* bracketing */
 
@@ -125,9 +138,15 @@ double coolsfr::DoCooling(double u_old, double rho, double dt, double *ne_guess,
         "%g\nDoCool->ne_guess_input= %g\n",
         DoCool->u_old_input, DoCool->rho_input, DoCool->dt_input, DoCool->ne_guess_input);
 
-  u *= All.UnitDensity_in_cgs / All.UnitPressure_in_cgs; /* to internal units */
+    u *= All.UnitDensity_in_cgs / All.UnitPressure_in_cgs; /* to internal units */
 
-  return u;
+    // Debug: Print final value and change
+    double final_u = u * All.UnitDensity_in_cgs / All.UnitPressure_in_cgs;
+    double delta_u = final_u - u_input;
+    mpi_printf("DOCOOLING: u_old=%g u_new=%g delta_u=%g LambdaNet=%g\n", 
+              u_input, final_u, delta_u, LambdaNet);
+  
+    return final_u;
 }
 
 /** \brief Return the cooling time.
@@ -718,6 +737,9 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
 
   double utherm = Sp->get_utherm_from_entropy(i);
 
+  mpi_printf("COOL_PARTICLE: Particle %d BEFORE: utherm=%.3e density=%.3e dt=%.3e\n", 
+    Sp->P[i].ID.get(), utherm, dens * All.cf_a3inv, dtime);
+
   double ne      = Sp->SphP[i].Ne; /* electron abundance (gives ionization state and mean molecular weight) */
   double unew    = DoCooling(std::max<double>(All.MinEgySpec, utherm), dens * All.cf_a3inv, dtime, &ne, gs, DoCool);
   Sp->SphP[i].Ne = ne;
@@ -736,6 +758,10 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
   if(dtime > 0)
     Sp->SphP[i].CoolHeat = du * Sp->P[i].getMass() / dtime;
 #endif
+
+  // Debug print after cooling
+  mpi_printf("COOL_PARTICLE: Particle %d AFTER: utherm=%.3e delta_u=%.3e cooling_rate=%.3e\n", 
+    Sp->P[i].ID.get(), utherm, du, (dtime > 0) ? du/dtime : 0.0);
 
   Sp->set_entropy_from_utherm(utherm, i);
   Sp->SphP[i].set_thermodynamic_variables();

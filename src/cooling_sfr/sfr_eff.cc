@@ -396,12 +396,12 @@
    
     // ADDING a ceiling to the energy to prevent runaway growth!!! 
     // Some gas particles were getting to 100000-200000 code units somehow
-    double energy_ceiling = 5000.0; // Adjust based on your units
-    if(egynew > energy_ceiling) {
-        egynew = energy_ceiling;
-        SF_PRINT("ENERGY: Capping energy for particle %d at ceiling=%.3e\n", 
-                Sp->P[i].ID.get(), energy_ceiling);
-    }
+    //double energy_ceiling = 5000.0; // Adjust based on your units
+    //if(egynew > energy_ceiling) {
+    //    egynew = energy_ceiling;
+    //    SF_PRINT("ENERGY: Capping energy for particle %d at ceiling=%.3e\n", 
+    //           Sp->P[i].ID.get(), energy_ceiling);
+    //}
 
 
    // Convert energy to entropy
@@ -529,7 +529,6 @@
                    // GO LOOK AT Shayou's GADGET3s random number generator
                    if(randomnum < p)
                      {
- 
                              if (sm >= Sp->P[target].getMass()) {
                                  // convert the entire gas particle into a star
                                  SF_PRINT("STARFORMATION: Reached star formation probability (convert)! random=%.4e is less than prob=%.4e\n", randomnum, p);
