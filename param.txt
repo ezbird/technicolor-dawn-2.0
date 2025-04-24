@@ -125,6 +125,7 @@ WindFreeTravelLength  20
 WindFreeTravelDensFac 0.1
 
 %----- Debugging
+StarFormationDebug  1     % Prints all star formation-related activity (0=off, 1=on)
 FeedbackDebug       0     % Prints all feedback-related activity (0=off, 1=on)
 FeedbackSNII        0     % Enable Type II supernova feedback (0=off, 1=on)
 FeedbackSNIa        0     % Enable Type Ia supernova feedback (0=off, 1=on)

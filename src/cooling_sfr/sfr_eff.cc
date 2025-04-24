@@ -38,6 +38,10 @@
  #include "../system/system.h"
  #include "../time_integration/timestep.h"
  
+  // Debug output function
+  #define SF_PRINT(...) \
+    do { if (All.StarFormationDebug) mpi_printf(__VA_ARGS__); } while (0)
+
  /**
   * The following routines implement the star formation and feedback model
   * from Springel & Hernquist 2003, MNRAS, 339, 289 (Multi-phase model).
@@ -440,7 +444,7 @@
        double windDelay = All.WindFreeTravelLength / windSpeed * All.cf_atime;
        Sp->SphP[i].DelayTime = windDelay;
        
-       mpi_printf("WINDS: Particle %d received wind kick, v=%g, delay=%g\n", Sp->P[i].ID.get(), windSpeed, windDelay);
+       SF_PRINT("WINDS: Particle %d received wind kick, v=%g, delay=%g\n", Sp->P[i].ID.get(), windSpeed, windDelay);
      }
  }
  #endif
@@ -507,12 +511,10 @@
                if(All.StarformationMode > 0)
                  {
                    // Calculate probability of forming a star
-                   //double p = sm / Sp->P[target].getMass(); // original Gadget-3 version
-                   double p = 1.0 - exp(-sm / Sp->P[target].getMass());  // newer
-
+                   double p = sm / Sp->P[target].getMass(); // original Gadget-3 version
+                   //double p = 1.0 - exp(-sm / Sp->P[target].getMass());  // newer
                    double randomnum = get_random_number();
-                   mpi_printf("STARFORMATION: Particle %d COULD form star with probability %g, random=%.3e, expected mass of star to be formed: %.4e\n", Sp->P[target].ID.get(), p, randomnum, sm);
- 
+
                    // Random draw to determine if star forms
                    // GO LOOK AT Shayou's GADGET3s random number generator
                    if(randomnum < p)
@@ -520,7 +522,7 @@
  
                              if (sm >= Sp->P[target].getMass()) {
                                  // convert the entire gas particle into a star
-                                 mpi_printf("STARFORMATION: Reached star formation probability (convert)! random=%.4e is less than prob=%.4e\n", randomnum, p);
+                                 SF_PRINT("STARFORMATION: Reached star formation probability (convert)! random=%.4e is less than prob=%.4e\n", randomnum, p);
                                  stars_converted++;
                                  sum_mass_stars += Sp->P[target].getMass();
                                  convert_sph_particle_into_star(Sp, target, All.Time);
@@ -528,18 +530,18 @@
                                  // spawn a brand new star of mass = sm
                                  if(Sp->NumPart + stars_spawned >= Sp->MaxPart) {
                                      if(ThisTask == 0)
-                                         printf("WARNING: no space to spawn star for gas particle %d (skipping)\n",
+                                     SF_PRINT("WARNING: no space to spawn star for gas particle %d (skipping)\n",
                                              Sp->P[target].ID.get());
                                      continue;  // skip this spawn, but keep processing the rest
                                  }
-                                 mpi_printf("STARFORMATION: Reached star formation probability (spawn)! random=%.4e is less than prob=%.4e\n", randomnum, p);
+                                 SF_PRINT("STARFORMATION: Reached star formation probability (spawn)! random=%.4e is less than prob=%.4e\n", randomnum, p);
                                  int j = Sp->NumPart + stars_spawned;
                                  spawn_star_from_sph_particle(Sp, target, All.Time, j, sm);
                                  sum_mass_stars += sm;
                                  stars_spawned++;
                              }
                          
-                       mpi_printf("STARFORMATION: Particle %d forms star with probability %g at z=%.3e\n", Sp->P[target].ID.get(), p, 1.0/All.Time - 1.0);
+                             SF_PRINT("STARFORMATION: Particle %d forms star with probability %g at z=%.3e\n", Sp->P[target].ID.get(), p, 1.0/All.Time - 1.0);
                        
                        // Add to the converted stellar mass
                        sum_mass_stars += Sp->P[target].getMass();
@@ -551,6 +553,7 @@
                
  #ifdef WINDS
                // Apply wind model
+               mpi_printf("WINDS IS ON!\n");
                winds_effective_model(Sp, target, dtime, sfr, cloudmassfrac);
  #endif
                
@@ -595,7 +598,7 @@
                All.Time, total_sm, totsfrrate, rate_in_msunperyear, total_mass_stars, cum_mass_stars);
        myflush(Logs.FdSfr);
        
-       mpi_printf("STARFORMATION: z=%g  SFR=%g Msun/yr  total_sm=%g  total_new_stars=%g\n",
+       SF_PRINT("STARFORMATION: z=%g  SFR=%g Msun/yr  total_sm=%g  total_new_stars=%g\n",
                   1.0/All.Time - 1.0, rate_in_msunperyear, total_sm, total_mass_stars);
      }
  
@@ -623,7 +626,7 @@
 
   // Print only from task 0
   if(ThisTask == 0)
-    printf("Snapshot Debug: %d total PartType4 stars exist at z=%.3f\n", 
+    SF_PRINT("STARFORMATION: %d total PartType4 stars exist at z=%.3f\n", 
           total_star_count, 1.0 / All.Time - 1.0);
 
    TIMER_STOP(CPU_COOLING_SFR);
@@ -643,7 +646,7 @@
   */
   void coolsfr::convert_sph_particle_into_star(simparticles *Sp, int i, double birthtime)
   {
-    printf("STAR: convert_sph_particle_into_star() called. Convert gas particle into star of mass %.3f!\n", Sp->P[i].getMass());
+    SF_PRINT("STAR: convert_sph_particle_into_star() called. Convert gas particle into star of mass %.3f!\n", Sp->P[i].getMass());
  
     Sp->P[i].setType(STAR_TYPE);
   #if NSOFTCLASSES > 1
@@ -678,21 +681,19 @@
   void coolsfr::spawn_star_from_sph_particle(simparticles *Sp, int igas, double birthtime, int istar, MyDouble mass_of_star)
   {
 
-
-printf("[STAR DEBUG] Called spawn_star_from_sph_particle. Created star ID=%d from gas ID=%d at time=%.6f\n",
-  Sp->P[istar].ID.get(), Sp->P[igas].ID.get(), All.Time);
-
-
+    SF_PRINT("[STAR DEBUG] Called spawn_star_from_sph_particle. Created star ID=%d from gas ID=%d at time=%.6f\n",
+        Sp->P[istar].ID.get(), Sp->P[igas].ID.get(), All.Time);
 
     Sp->P[istar] = Sp->P[igas];
     Sp->P[istar].setType(STAR_TYPE);
-  #if NSOFTCLASSES > 1
-    Sp->P[istar].setSofteningClass(All.SofteningClassOfPartType[Sp->P[istar].getType()]);
-  #endif
-  #ifdef INDIVIDUAL_GRAVITY_SOFTENING
-    if(((1 << Sp->P[istar].getType()) & (INDIVIDUAL_GRAVITY_SOFTENING)))
-      Sp->P[istar].setSofteningClass(Sp->get_softening_type_from_mass(Sp->P[istar].getMass()));
-  #endif
+
+    #if NSOFTCLASSES > 1
+      Sp->P[istar].setSofteningClass(All.SofteningClassOfPartType[Sp->P[istar].getType()]);
+    #endif
+    #ifdef INDIVIDUAL_GRAVITY_SOFTENING
+      if(((1 << Sp->P[istar].getType()) & (INDIVIDUAL_GRAVITY_SOFTENING)))
+        Sp->P[istar].setSofteningClass(Sp->get_softening_type_from_mass(Sp->P[istar].getMass()));
+    #endif
   
     Sp->TimeBinsGravity.ActiveParticleList[Sp->TimeBinsGravity.NActiveParticles++] = istar;
   

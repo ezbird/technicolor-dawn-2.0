@@ -94,6 +94,7 @@ STARFORMATION                                # Enables star formation with the S
 #DUST
 #SUPERNOVA
 #FEEDBACK
+#WINDS
 
 #---------------------------------------- Single/double precision and data types
 
