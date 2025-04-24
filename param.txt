@@ -2,7 +2,7 @@
 % update in allvars.cc and allvars.h
 
 %----  Relevant files 
-InitCondFile         ICs/ics_from_music_32
+InitCondFile         ICs/ics_from_music_16
 OutputDir            ./output
 SnapshotFileBase     snapshot
 OutputListFilename   empty.txt

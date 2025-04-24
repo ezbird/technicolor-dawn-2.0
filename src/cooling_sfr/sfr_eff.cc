@@ -610,7 +610,22 @@
    for(int i = 0; i < Sp->NumPart; i++)
      if(Sp->P[i].getType() == 4)
        star_count++;
-   mpi_printf("Snapshot Debug: %d PartType4 stars exist at z=%.3f\n", star_count, 1.0 / All.Time - 1.0);
+
+  // Calculate local star count
+  int local_star_count = 0;
+  for(int i = 0; i < Sp->NumPart; i++)
+    if(Sp->P[i].getType() == 4)
+      local_star_count++;
+
+  // Sum across all processes
+  int total_star_count;
+  MPI_Reduce(&local_star_count, &total_star_count, 1, MPI_INT, MPI_SUM, 0, Communicator);
+
+  // Print only from task 0
+  if(ThisTask == 0)
+    printf("Snapshot Debug: %d total PartType4 stars exist at z=%.3f\n", 
+          total_star_count, 1.0 / All.Time - 1.0);
+
    TIMER_STOP(CPU_COOLING_SFR);
  
  }
@@ -628,7 +643,7 @@
   */
   void coolsfr::convert_sph_particle_into_star(simparticles *Sp, int i, double birthtime)
   {
-    printf("STAR: convert gas particle into star of mass %.3f!\n", Sp->P[i].getMass());
+    printf("STAR: convert_sph_particle_into_star() called. Convert gas particle into star of mass %.3f!\n", Sp->P[i].getMass());
  
     Sp->P[i].setType(STAR_TYPE);
   #if NSOFTCLASSES > 1
@@ -662,6 +677,13 @@
   */
   void coolsfr::spawn_star_from_sph_particle(simparticles *Sp, int igas, double birthtime, int istar, MyDouble mass_of_star)
   {
+
+
+printf("[STAR DEBUG] Called spawn_star_from_sph_particle. Created star ID=%d from gas ID=%d at time=%.6f\n",
+       P[istar].ID.get(), P[igas].ID.get(), All.Time);
+
+
+
     Sp->P[istar] = Sp->P[igas];
     Sp->P[istar].setType(STAR_TYPE);
   #if NSOFTCLASSES > 1
