@@ -529,7 +529,6 @@
                    // GO LOOK AT Shayou's GADGET3s random number generator
                    if(randomnum < p)
                      {
- 
                              if (sm >= Sp->P[target].getMass()) {
                                  // convert the entire gas particle into a star
                                  SF_PRINT("STARFORMATION: Reached star formation probability (convert)! random=%.4e is less than prob=%.4e\n", randomnum, p);
