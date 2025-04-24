@@ -255,6 +255,12 @@ void coolsfr::find_abundances_and_rates(double logT, double rho, double *ne_gues
   double rho_input  = rho;
   double ne_input   = *ne_guess;
 
+  if(logT == -INFINITY || isnan(logT)) {
+    printf("[Cooling Debug] Task=%d Part-ID=%d rho=%.5e u=%.5e logT=%.5e\n",
+           ThisTask, i, rho, u, logT);
+    fflush(stdout);
+}
+
   if(!gsl_finite(logT))
     Terminate("logT=%g\n", logT);
 
