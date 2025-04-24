@@ -1,8 +1,8 @@
 % Parameters for Technicolor Dawn v2
-% update in allvars.cc and allvars.h
+% new parameters must be updated in allvars.cc and allvars.h
 
 %----  Relevant files 
-InitCondFile         ICs/ics_from_music_16
+InitCondFile         ICs/IC_from_music_16_2kpc
 OutputDir            ./output
 SnapshotFileBase     snapshot
 OutputListFilename   empty.txt
@@ -31,7 +31,7 @@ OmegaLambda               0.6911
 OmegaBaryon               0.0486
 HubbleParam               0.6774
 Hubble                    100
-BoxSize                   10.0
+BoxSize                   2          %  in kpc
 
 %---- Output frequency and output paramaters
 OutputListOn              0
