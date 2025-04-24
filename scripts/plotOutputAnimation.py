@@ -42,4 +42,10 @@ for frame, filename in enumerate(snapshot_files):
 
     ax.set_title(f'Particle Map - Snapshot {snap_num} - z={redshift:.2f} - Stars: {num_stars}', fontsize=16)
     ax.set_xlabel("X [kpc]")
-    ax.set_ylabel("_
+    ax.set_ylabel("Y [kpc]")
+    ax.legend(loc='upper right')
+
+    # Save the figure
+    frame_path = os.path.join(output_folder, f"frame_{frame:03d}.png")
+    plt.savefig(frame_path)
+    plt.close(fig)
