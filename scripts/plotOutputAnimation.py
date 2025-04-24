@@ -2,10 +2,9 @@ import glob
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
+import os
 
-# Define colors (and optional marker sizes) for each PartType.
-# Modify these if your simulation uses different types or you wish different styling.
+# Define colors for each PartType
 part_colors = {
     'PartType0': {'name': 'Gas', 'color': 'blue', 'size': 2},
     'PartType1': {'name': 'Dark Matter', 'color': 'black', 'size': 2},
@@ -16,51 +15,31 @@ part_colors = {
     'PartType6': {'name': 'Dust', 'color': 'green', 'size': 5}
 }
 
-# Change the glob pattern to match the snapshot filenames
+# Snapshot files
 snapshot_files = sorted(glob.glob("../output/snap*.hdf5"))
 
-# Set up the figure and axis.
-fig, ax = plt.subplots(figsize=(8, 8))
+# Create output folder for frames
+output_folder = "frames"
+os.makedirs(output_folder, exist_ok=True)
 
-def update(frame):
-    ax.clear()
-    filename = snapshot_files[frame]
+# Loop through each snapshot and create a figure
+for frame, filename in enumerate(snapshot_files):
+    fig, ax = plt.subplots(figsize=(8, 8))
     with h5py.File(filename, 'r') as f:
-        # Loop through our defined particle types.
         for part, props in part_colors.items():
             if part in f:
-                snap_num = int(filename.split("_")[-1].split(".")[0])
-                time = f['Header'].attrs['Time']  # Scale factor
-                
-                # Calculate redshift from scale factor: z = 1/a - 1
-                redshift = 1.0/time - 1.0
-
-                # Count star particles (Type 4)
-                num_stars = 0
-                if 'PartType4' in f:
-                    num_stars = len(f['PartType4/Coordinates'])
-
-                # Read the particle coordinates.
-                coords = f[part]['Coordinates'][:]  # Expecting shape (N, 3)
-                # Plot only x and y (2D projection).
+                coords = f[part]['Coordinates'][:]
                 ax.scatter(coords[:, 0], coords[:, 1],
                            s=props['size'],
                            c=props['color'],
                            label=props['name'],
                            alpha=0.7)
-    ax.set_xlabel("X [kpc]")
-    ax.set_ylabel("Y [kpc]")
-    #ax.set_title(f"Snapshot {frame}: {filename}")
+
+        time = f['Header'].attrs['Time']
+        redshift = 1.0 / time - 1.0
+        snap_num = int(filename.split("_")[-1].split(".")[0])
+        num_stars = len(f['PartType4/Coordinates']) if 'PartType4' in f else 0
+
     ax.set_title(f'Particle Map - Snapshot {snap_num} - z={redshift:.2f} - Stars: {num_stars}', fontsize=16)
-    # Optionally, set the axis limits based on your simulation scale.
-    # ax.set_xlim(-500, 500)
-    # ax.set_ylim(-500, 500)
-    ax.legend(loc='upper right')
-
-# Create the animation.
-ani = animation.FuncAnimation(fig, update, frames=len(snapshot_files), interval=500)
-
-plt.show()
-
-# Optionally, to save the animation as a video (requires ffmpeg):
-ani.save("gadget4_animation.mp4", writer="ffmpeg", dpi=200)
+    ax.set_xlabel("X [kpc]")
+    ax.set_ylabel("_
