@@ -1,0 +1,153 @@
+% Parameters for Technicolor Dawn v2
+% update in allvars.cc and allvars.h
+
+%----  Relevant files 
+InitCondFile         ICs/ics_from_music_16
+OutputDir            ./output
+SnapshotFileBase     snapshot
+OutputListFilename   empty.txt
+
+%---- File formats
+ICFormat             3
+SnapFormat           3 
+
+%---- CPU-time limits
+TimeLimitCPU              86400   % 24h, in seconds
+CpuTimeBetRestartFile     7200    % 2h,  in seconds
+
+%----- Memory allocation
+MaxMemSize                1000    % in MByte
+
+%---- Characteristics of run
+TimeBegin                 0.015625   % Begin of the simulation, z = 63
+TimeMax	                  1.0        % End of the simulation,   z = 0
+
+%---- Basic code options that set the type of simulation
+ComovingIntegrationOn     1 
+
+%---- Cosmological parameters
+Omega0	                  0.3089
+OmegaLambda               0.6911
+OmegaBaryon               0.0486
+HubbleParam               0.6774
+Hubble                    100
+BoxSize                   10.0
+
+%---- Output frequency and output paramaters
+OutputListOn              0
+TimeBetSnapshot           1.0627825
+TimeOfFirstSnapshot       0.02
+TimeBetStatistics         0.05
+NumFilesPerSnapshot       1
+MaxFilesWithConcurrentIO  1
+
+
+%---- Accuracy of time integration
+ErrTolIntAccuracy        0.02 
+CourantFac               0.3
+MaxSizeTimestep          0.05
+MinSizeTimestep          0.0
+
+%---- Tree algorithm, force accuracy, domain update frequency
+TypeOfOpeningCriterion                1
+ErrTolTheta                           0.9
+ErrTolThetaMax                        1.0
+ErrTolForceAcc                        0.002
+TopNodeFactor                         3.0
+ActivePartFracForNewDomainDecomp      0.01
+
+%---- Initial density estimate
+DesNumNgb                        20   ; should be 33 or higher with a bigger volume! lowering now for test runs
+MaxNumNgbDeviation               1 
+
+%---- System of units
+UnitLength_in_cm         3.085678e24        ;  Mpc / h is 3.085678e24; 1.0 kpc / h is 3.085678e21
+UnitMass_in_g            1.989e43           ;  1.0e10 Msun / h
+UnitVelocity_in_cm_per_s 1e5                ;  1 km/sec
+GravityConstantInternal  0
+
+
+%---- Gravitational softening length (in internal units, e.g., Mpc/h)
+SofteningComovingClass0      0.02     ; gas      = 20 kpc/h
+SofteningComovingClass1      0.05     ; dark matter = 50 kpc/h
+SofteningComovingClass2      0
+SofteningComovingClass3      0
+SofteningComovingClass4      0.01     ; stars    = 10 kpc/h
+SofteningComovingClass5      0
+SofteningComovingClass6      0.01     ; dust     = 10 kpc/h
+
+SofteningMaxPhysClass0       0.005    ; gas      = 5 kpc
+SofteningMaxPhysClass1       0.01     ; DM       = 10 kpc
+SofteningMaxPhysClass2       0  
+SofteningMaxPhysClass3       0
+SofteningMaxPhysClass4       0.002    ; stars    = 2 kpc
+SofteningMaxPhysClass5       0
+SofteningMaxPhysClass6       0.002    ; dust     = 2 kpc
+
+SofteningClassOfPartType0    0        ; gas
+SofteningClassOfPartType1    1        ; dark matter
+SofteningClassOfPartType2    2
+SofteningClassOfPartType3    3
+SofteningClassOfPartType4    4        ; stars
+SofteningClassOfPartType5    5
+SofteningClassOfPartType6    6        ; dust
+
+GasSoftFactor 1.5
+AdaptiveHydroSofteningSpacing 1.05
+MinimumComovingHydroSoftening 0.001
+
+%----- SPH
+ArtBulkViscConst             1.0
+MinEgySpec                   0     ; Prevents gas from cooling below this specific internal energy floor (in code units, i.e., energy per unit mass).
+InitGasTemp                  400   ; Sets the initial gas temperature, if not provided in the ICs.
+ViscosityAlphaMin            0.01  ; minimum viscosity coefficient 
+
+%----- Star formation
+
+StarformationMode     1
+MetalYield            0.02
+MaxSfrTimescale       1.5         % usually 1.5; Gas consumption timescale (multi-phase model)
+MaxStarFormationTemp  15000      % only form stars where T < 15000 K
+FactorSN              0.1        % beta, mass fraction of massive stars (multi-phase model)
+FactorEVP             500        % A_0, evaporation parameter (multi-phase model); smaller value means lower pressure support, making it easier for gas to collapse
+TempSupernova         1e8         % T_SN, effective "supernova temperature",sets feedback energy (multi-phase model)
+TempClouds            1000        % temperature of cold clouds (multi-phase model)
+CritOverDensity       1000        % overdensity threshold value for cosmological sims; lower value means conditions easier to reach for SF
+CritPhysDensity       0.1         % critical physical density for star formation (in cm^(-3))
+PhysDensThresh        0.0
+CritHydrogenDensity   0.1      % only form stars where n_H > 0.1 cm^-3
+TreecoolFile        data/TREECOOL
+
+% ---- Wind
+WindEfficiency        2.0
+WindEnergyFraction    1.0
+WindFreeTravelLength  20
+WindFreeTravelDensFac 0.1
+
+%----- Debugging
+StarFormationDebug  1     % Prints all star formation-related activity (0=off, 1=on)
+FeedbackDebug       0     % Prints all feedback-related activity (0=off, 1=on)
+FeedbackSNII        0     % Enable Type II supernova feedback (0=off, 1=on)
+FeedbackSNIa        0     % Enable Type Ia supernova feedback (0=off, 1=on)
+FeedbackAGB         0     % Enable AGB stellar winds feedback (0=off, 1=on)
+
+
+%----- Dust properties (PartType6)
+#DustFormationEfficiency 0.1   # 10% of metals turn into dust
+#DustGrowthTimescale 1e7       # Growth timescale in years
+#DustDestructionTimescale 1e8  # Destruction timescale in years
+#DustVelocityScaling 1.0       # Velocity factor for dust
+
+%----- N-GenIC: Initial conditions -- ONLY DOES DM!
+%PowerSpectrumFile powerspec_CAMB_Planck2018_logk_logDelta2.txt
+%PowerSpectrumType 2
+%NSample 32              % Normally, choose Nsample such that Ntot = Nsample^3, where Ntot is the total number of particles
+%GridSize 32
+%PrimordialIndex 1.0
+%Sigma8 0.811    % 0.811
+%ReNormalizeInputSpectrum 1
+%SphereMode 0
+%Seed 123456
+%InputSpectrum_UnitLength_in_cm 3.085678e24     % may need to confirm this!
+%ShapeGamma 0.25
+%UseGasParticles 1

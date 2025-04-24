@@ -3,7 +3,7 @@ import numpy as np
 import shutil
 
 infile = "ics_arepo.hdf5"
-outfile = "ics_from_music_16.hdf5"
+outfile = "ics_from_music_32.hdf5"
 
 # Copy the file so we don't modify the original
 shutil.copy(infile, outfile)
@@ -30,7 +30,7 @@ with h5py.File(outfile, "r+") as f:
 
 
 # MUSIC creates the masses in physical units (solar masses) and Gadget is expecting its internal units 10^10 Msolar/h
-mass_unit_scale = 1e9  # Convert M☉ to 1e10 M☉/h
+mass_unit_scale = 10**9  # Convert M☉ to 1e10 M☉/h
 
 with h5py.File(outfile, "r+") as f:
     mt = f['Header'].attrs['MassTable']
