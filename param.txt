@@ -99,7 +99,7 @@ MinimumComovingHydroSoftening 0.001
 %----- SPH
 ArtBulkViscConst             1.0
 MinEgySpec                   0     ; Prevents gas from cooling below this specific internal energy floor (in code units, i.e., energy per unit mass).
-InitGasTemp                  400   ; Sets the initial gas temperature, if not provided in the ICs.
+InitGasTemp                  0   ; Sets the initial gas temperature, if not provided in the ICs.
 ViscosityAlphaMin            0.01  ; minimum viscosity coefficient 
 
 %----- Star formation
