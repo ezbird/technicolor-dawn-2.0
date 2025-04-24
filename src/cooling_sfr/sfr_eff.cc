@@ -680,7 +680,7 @@
 
 
 printf("[STAR DEBUG] Called spawn_star_from_sph_particle. Created star ID=%d from gas ID=%d at time=%.6f\n",
-       P[istar].ID.get(), P[igas].ID.get(), All.Time);
+  Sp->P[istar].ID.get(), Sp->P[igas].ID.get(), All.Time);
 
 
 
