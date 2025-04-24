@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Replace with your snapshot path
-snapshot_path = "snapshot_023.hdf5"
+snapshot_path = "../output/snapshot_023.hdf5"
 
 with h5py.File(snapshot_path, "r") as f:
     u = f["PartType0/InternalEnergy"][:]       # Specific internal energy [code units]
