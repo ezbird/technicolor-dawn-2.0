@@ -396,12 +396,12 @@
    
     // ADDING a ceiling to the energy to prevent runaway growth!!! 
     // Some gas particles were getting to 100000-200000 code units somehow
-    double energy_ceiling = 5000.0; // Adjust based on your units
-    if(egynew > energy_ceiling) {
-        egynew = energy_ceiling;
-        SF_PRINT("ENERGY: Capping energy for particle %d at ceiling=%.3e\n", 
-                Sp->P[i].ID.get(), energy_ceiling);
-    }
+    //double energy_ceiling = 5000.0; // Adjust based on your units
+    //if(egynew > energy_ceiling) {
+    //    egynew = energy_ceiling;
+    //    SF_PRINT("ENERGY: Capping energy for particle %d at ceiling=%.3e\n", 
+    //           Sp->P[i].ID.get(), energy_ceiling);
+    //}
 
 
    // Convert energy to entropy

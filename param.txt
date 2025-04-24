@@ -103,7 +103,6 @@ InitGasTemp                  400   ; Sets the initial gas temperature, if not pr
 ViscosityAlphaMin            0.01  ; minimum viscosity coefficient 
 
 %----- Star formation
-
 StarformationMode     1
 MetalYield            0.02
 MaxSfrTimescale       1.5         % usually 1.5; Gas consumption timescale (multi-phase model)
