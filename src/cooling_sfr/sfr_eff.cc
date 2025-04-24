@@ -40,7 +40,7 @@
  
   // Debug output function
   #define SF_PRINT(...) \
-    do { if (All.StarFormationDebug) mpi_printf(__VA_ARGS__); } while (0)
+    do { if (All.StarFormationDebug) printf(__VA_ARGS__); } while (0)
 
  /**
   * The following routines implement the star formation and feedback model
