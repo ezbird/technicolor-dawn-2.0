@@ -43,7 +43,10 @@ with h5py.File(outfile, "r+") as f:
     pad_array("MassTable")
 
 # Convert MassTable from solar masses to Gadget internal units: 10^10 M_sun/h
-mass_unit_scale = 1e9  # Convert M_sun → 10^10 M_sun/h
+mass_unit_scale = 1    # 1e9  # Convert M_sun → 10^10 M_sun/h
+                       # This is only needed if we change the param: UnitLength_in_cm         3.085678e21        ;  Mpc / h is 3.085678e24; 1.0 kpc / h is 3.085678e21
+
+
 with h5py.File(outfile, "r+") as f:
     mt = f['Header'].attrs['MassTable']
     fixed = mt * mass_unit_scale
