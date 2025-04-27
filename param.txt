@@ -2,7 +2,7 @@
 % new parameters must be updated in allvars.cc and allvars.h
 
 %----  Relevant files 
-InitCondFile         ICs/IC_from_music_16_2kpc
+InitCondFile         ICs/IC_gadget4_32_1000kpc
 OutputDir            ./output
 SnapshotFileBase     snapshot
 OutputListFilename   empty.txt
@@ -31,7 +31,7 @@ OmegaLambda               0.6911
 OmegaBaryon               0.0486
 HubbleParam               0.6774
 Hubble                    100
-BoxSize                   2          %  in kpc
+BoxSize                   1000          %  in kpc
 
 %---- Output frequency and output paramaters
 OutputListOn              0
@@ -105,12 +105,12 @@ ViscosityAlphaMin            0.01   ; minimum viscosity coefficient
 %----- Star formation
 StarformationMode     1
 MetalYield            0.02
-MaxSfrTimescale       1.5         % usually 1.5; Gas consumption timescale (multi-phase model)
+MaxSfrTimescale       1.0         % usually 1.5; Gas consumption timescale (multi-phase model)
 MaxStarFormationTemp  15000      % only form stars where T < 15000 K
 FactorSN              0.1        % beta, mass fraction of massive stars (multi-phase model)
 FactorEVP             500        % A_0, evaporation parameter (multi-phase model); smaller value means lower pressure support, making it easier for gas to collapse
 TempSupernova         1e8         % T_SN, effective "supernova temperature",sets feedback energy (multi-phase model)
-TempClouds            1000        % temperature of cold clouds (multi-phase model)
+TempClouds            500        % temperature of cold clouds (multi-phase model)
 CritOverDensity       1000        % overdensity threshold value for cosmological sims; lower value means conditions easier to reach for SF
 CritPhysDensity       0.1         % critical physical density for star formation (in cm^(-3))
 PhysDensThresh        0.0

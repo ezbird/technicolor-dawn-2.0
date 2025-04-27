@@ -74,12 +74,10 @@
    
    // Debug: check if we're heating or cooling
    if(LambdaNet > 0) {
-     mpi_printf("DOCOOLING: HEATING detected - LambdaNet=%g for u=%g rho=%g\n", 
-               LambdaNet, u_input, DoCool->rho_input);
+     //mpi_printf("DOCOOLING: HEATING detected - LambdaNet=%g for u=%g rho=%g\n", LambdaNet, u_input, DoCool->rho_input);
    }
    else {
-     mpi_printf("DOCOOLING: COOLING detected - LambdaNet=%g for u=%g rho=%g\n", 
-               LambdaNet, u_input, DoCool->rho_input);
+     //mpi_printf("DOCOOLING: COOLING detected - LambdaNet=%g for u=%g rho=%g\n", LambdaNet, u_input, DoCool->rho_input);
    }
 
   /* bracketing */
@@ -743,7 +741,7 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
 
   double utherm = Sp->get_utherm_from_entropy(i);
 
-  mpi_printf("COOL_PARTICLE: Particle %d BEFORE: utherm=%.3e density=%.3e dt=%.3e\n", 
+  //mpi_printf("COOL_PARTICLE: Particle %d BEFORE: utherm=%.3e density=%.3e dt=%.3e\n", 
     Sp->P[i].ID.get(), utherm, dens * All.cf_a3inv, dtime);
 
   double ne      = Sp->SphP[i].Ne; /* electron abundance (gives ionization state and mean molecular weight) */
