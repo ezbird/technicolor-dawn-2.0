@@ -2,7 +2,7 @@
 % new parameters must be updated in allvars.cc and allvars.h
 
 %----  Relevant files 
-InitCondFile         ICs/IC_gadget4_32_1000kpc
+InitCondFile         ICs/IC_gadget4_64_1000kpc
 OutputDir            ./output
 SnapshotFileBase     snapshot
 OutputListFilename   empty.txt
@@ -16,7 +16,7 @@ TimeLimitCPU              86400   % 24h, in seconds
 CpuTimeBetRestartFile     7200    % 2h,  in seconds
 
 %----- Memory allocation
-MaxMemSize                1000    % in MByte
+MaxMemSize                1200    % in MByte
 
 %---- Characteristics of run
 TimeBegin                 0.015625   % Begin of the simulation, z = 63
@@ -61,7 +61,7 @@ DesNumNgb                        20   ; should be 33 or higher with a bigger vol
 MaxNumNgbDeviation               1 
 
 %---- System of units
-UnitLength_in_cm         3.085678e24        ;  Mpc / h is 3.085678e24; 1.0 kpc / h is 3.085678e21
+UnitLength_in_cm         3.085678e21        ;  Mpc / h is 3.085678e24; 1.0 kpc / h is 3.085678e21
 UnitMass_in_g            1.989e43           ;  1.0e10 Msun / h
 UnitVelocity_in_cm_per_s 1e5                ;  1 km/sec
 GravityConstantInternal  0
