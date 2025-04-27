@@ -741,8 +741,7 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
 
   double utherm = Sp->get_utherm_from_entropy(i);
 
-  //mpi_printf("COOL_PARTICLE: Particle %d BEFORE: utherm=%.3e density=%.3e dt=%.3e\n", 
-    Sp->P[i].ID.get(), utherm, dens * All.cf_a3inv, dtime);
+  //mpi_printf("COOL_PARTICLE: Particle %d BEFORE: utherm=%.3e density=%.3e dt=%.3e\n", Sp->P[i].ID.get(), utherm, dens * All.cf_a3inv, dtime);
 
   double ne      = Sp->SphP[i].Ne; /* electron abundance (gives ionization state and mean molecular weight) */
   double unew    = DoCooling(std::max<double>(All.MinEgySpec, utherm), dens * All.cf_a3inv, dtime, &ne, gs, DoCool);
