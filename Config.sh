@@ -25,8 +25,8 @@ RANDOMIZE_DOMAINCENTER                       # shifts the particle distribution 
 #--------------------------------------- Gravity calculation
 
 SELFGRAVITY                                   # switch to enable self-gravity of particles (typically always on)
-FMM                                          # enables Fast Multipole Method instead of one-sided tree algorithm
-MULTIPOLE_ORDER=2                            # sets the multipole order of Tree or FMM computations
+#FMM                                          # enables Fast Multipole Method instead of one-sided tree algorithm
+#MULTIPOLE_ORDER=2                            # sets the multipole order of Tree or FMM computations
 #EVALPOTENTIAL                                # computes gravitational potential besides force
 #EXTRAPOTTERM                                 # this computes an extra multipole term for the potential which is not needed for the forces
 #EXTRA_HIGH_EWALD_ACCURACY                    # this uses third-order instead of second-order Taylor expansion to interpolate Ewald corrections from table 
@@ -64,7 +64,7 @@ ADAPTIVE_HYDRO_SOFTENING                     # makes SPH gas particles pick an a
 #--------------------------------------- SPH treatment and formulation
 
 #REUSE_HYDRO_ACCELERATIONS_FROM_PREVIOUS_STEP # does not recompute the pressure forces after application of source functions 
-VISCOSITY_LIMITER_FOR_LARGE_TIMESTEPS        # limits the acceleration due to the viscosity  
+#VISCOSITY_LIMITER_FOR_LARGE_TIMESTEPS        # limits the acceleration due to the viscosity  
 #PRESSURE_ENTROPY_SPH                         # enables the Hopkins (2013) pressure-entropy formulation, other density-entropy is used
 #GAMMA=1.4                                    # sets the adiabatic index
 #ISOTHERM_EQS                                 # selects an isothermal equation of state (read to NOT include this if using PRESSURE_ENTROPY_SPH)
