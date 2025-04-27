@@ -11,8 +11,8 @@ import numpy as np
 import shutil
 
 # Input and output file paths
-infile = "IC_gadget3_64_1000kpc.hdf5"
-outfile = "IC_gadget4_64_1000kpc.hdf5"
+infile = "IC_gadget3_32_1000kpc.hdf5"
+outfile = "IC_gadget4_32_1000kpc.hdf5"
 
 # Create a copy of the input file so we don't modify the original
 shutil.copy(infile, outfile)
