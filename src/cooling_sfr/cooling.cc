@@ -141,8 +141,7 @@
     // Debug: Print final value and change
     double final_u = u * All.UnitDensity_in_cgs / All.UnitPressure_in_cgs;
     double delta_u = final_u - u_input;
-    mpi_printf("DOCOOLING: u_old=%g u_new=%g delta_u=%g LambdaNet=%g\n", 
-              u_input, final_u, delta_u, LambdaNet);
+    //mpi_printf("DOCOOLING: u_old=%g u_new=%g delta_u=%g LambdaNet=%g\n", u_input, final_u, delta_u, LambdaNet);
   
     return final_u;
 }
@@ -763,8 +762,7 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
 #endif
 
   // Debug print after cooling
-  mpi_printf("COOL_PARTICLE: Particle %d AFTER: utherm=%.3e delta_u=%.3e cooling_rate=%.3e\n", 
-    Sp->P[i].ID.get(), utherm, du, (dtime > 0) ? du/dtime : 0.0);
+  //mpi_printf("COOL_PARTICLE: Particle %d AFTER: utherm=%.3e delta_u=%.3e cooling_rate=%.3e\n", Sp->P[i].ID.get(), utherm, du, (dtime > 0) ? du/dtime : 0.0);
 
   Sp->set_entropy_from_utherm(utherm, i);
   Sp->SphP[i].set_thermodynamic_variables();
