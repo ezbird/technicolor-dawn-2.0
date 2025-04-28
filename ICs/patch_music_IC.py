@@ -3,7 +3,7 @@
 
   Converts MassTable from physical units to internal units (10^10 M_solar/h)
 
-  Adds a missing InternalEnergy field to gas particles (with a hardcoded value).
+  Adds a missing InternalEnergy field to gas particles (with a hardcoded value of 200).
 '''
 
 import h5py
@@ -11,8 +11,8 @@ import numpy as np
 import shutil
 
 # Input and output file paths
-infile = "IC_gadget3_32_1000kpc.hdf5"
-outfile = "IC_gadget4_32_1000kpc.hdf5"
+infile = "IC_gadget3_64_250kpc.hdf5"
+outfile = "IC_gadget4_64_250kpc.hdf5"
 
 # Create a copy of the input file so we don't modify the original
 shutil.copy(infile, outfile)
