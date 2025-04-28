@@ -1,73 +1,89 @@
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
-import glob
 import os
-import matplotlib.animation as animation
+import glob
+
+# --------- Configuration ---------
+SNAPSHOT_FOLDER = "../output/"    # <-- Change this to wherever your snapshots are saved!
+OUTPUT_FOLDER = "SFR"     # Folder to save the plots
+# ----------------------------------
 
 # Constants
-snapshots = sorted(glob.glob("../output/snapshot_*.hdf5"))
-#snapshots = sorted(glob.glob("../snap_*.hdf5"))
-sfrd_values = []
-redshifts = []
+gamma_minus_one = 5.0/3.0 - 1.0  # assuming ideal monoatomic gas
+mean_molecular_weight = 0.6      # for ionized primordial gas
+proton_mass_cgs = 1.6726e-24
+boltzmann_cgs = 1.3806e-16
 
-# Load data
-for snapfile in snapshots:
-    with h5py.File(snapfile, "r") as snap:
-        header = dict(snap["Header"].attrs)
-        a = header["Time"]
-        redshift = 1.0 / a - 1.0
-        boxsize_kpc = header["BoxSize"]  # comoving, in code units
-        boxsize_Mpc = boxsize_kpc / 1e3  # convert to Mpc/h
-        volume_Mpc3 = boxsize_Mpc**3     # comoving volume in (Mpc/h)^3
+# Make output folder
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-        try:
-            sfr = np.array(snap["PartType0/StarFormationRate"])
-            total_sfr = np.sum(sfr)  # in Msun/yr
-        except KeyError:
-            total_sfr = 0.0
+# Find all snapshot files
+snapshot_files = sorted(glob.glob(os.path.join(SNAPSHOT_FOLDER, "snapshot_*.hdf5")))
 
-        sfrd = total_sfr / volume_Mpc3  # Msun/yr/(Mpc/h)^3
-        sfrd_values.append(sfrd)
-        redshifts.append(redshift)
+# Initialize cumulative storage
+all_redshifts = []
+all_SFRs = []
+all_Temps = []
 
-# Sort by decreasing redshift
-redshifts, sfrd_values = zip(*sorted(zip(redshifts, sfrd_values), reverse=True))
-redshifts = np.array(redshifts)
-sfrd_values = np.array(sfrd_values)
+for snap in snapshot_files:
+    with h5py.File(snap, 'r') as f:
+        header = f['Header'].attrs
+        redshift = header['Redshift']
+        
+        if 'PartType0' not in f:
+            continue
+        
+        gas = f['PartType0']
+        
+        if 'InternalEnergy' not in gas:
+            continue
+        
+        u = gas['InternalEnergy'][:]
+        
+        # Check if ElectronAbundance exists
+        if 'ElectronAbundance' in gas:
+            ne = gas['ElectronAbundance'][:]
+            mu = 4.0 / (1.0 + 3.0 * 0.76 + 4.0 * 0.76 * ne)
+        else:
+            mu = mean_molecular_weight
+        
+        # Convert Internal Energy to Temperature
+        Temp = (gamma_minus_one) * u * mu * proton_mass_cgs / boltzmann_cgs
+        
+        mean_Temp = np.mean(Temp)
+        
+        # Star formation rate
+        if 'StarFormationRate' in gas:
+            sfr = gas['StarFormationRate'][:]
+            mean_SFR = np.mean(sfr)
+        else:
+            mean_SFR = 0.0
+        
+        all_redshifts.append(redshift)
+        all_SFRs.append(mean_SFR)
+        all_Temps.append(mean_Temp)
+        
+        # --- Make the 2-panel plot ---
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+        
+        axs[0].plot(all_redshifts, all_SFRs, 'bo-')
+        axs[0].set_xlabel('Redshift')
+        axs[0].set_ylabel('Mean SFR [Msun/yr]')
+        axs[0].invert_xaxis()
+        axs[0].set_title('Mean Star Formation Rate')
+        
+        axs[1].plot(all_redshifts, all_Temps, 'ro-')
+        axs[1].set_xlabel('Redshift')
+        axs[1].set_ylabel('Mean Gas Temperature [K]')
+        axs[1].invert_xaxis()
+        axs[1].set_title('Mean Gas Temperature')
+        
+        plt.suptitle(f"Snapshot: {os.path.basename(snap)}")
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        
+        outname = os.path.join(OUTPUT_FOLDER, os.path.basename(snap).replace('.hdf5', '.png'))
+        plt.savefig(outname)
+        plt.close()
 
-# Static plot
-plt.figure(figsize=(8,6))
-plt.plot(redshifts, sfrd_values, marker='o')
-plt.xlabel("Redshift (z)")
-plt.ylabel("SFR Density [Msun/yr/(Mpc/h)^3]")
-plt.yscale("log")
-plt.gca().invert_xaxis()
-plt.grid(True, which="both", ls="--", alpha=0.4)
-plt.title("Star Formation Rate Density vs Redshift")
-plt.tight_layout()
-plt.savefig("sfrd_vs_redshift.png", dpi=200)
-plt.show()
-
-# Animate the growth of the line
-fig, ax = plt.subplots(figsize=(8,6))
-line, = ax.plot([], [], 'o-', lw=2)
-ax.set_xlabel("Redshift (z)")
-ax.set_ylabel("SFR Density [Msun/yr/(Mpc/h)^3]")
-ax.set_yscale("log")
-ax.invert_xaxis()
-ax.grid(True, which="both", ls="--", alpha=0.3)
-ax.set_xlim(redshifts[0], redshifts[-1])
-ax.set_ylim(max(min(sfrd_values[sfrd_values > 0]) * 0.1, 1e-6), max(sfrd_values)*1.2)
-ax.set_title("Star Formation History (Build-up)")
-
-def update(i):
-    line.set_data(redshifts[:i+1], sfrd_values[:i+1])
-    return line,
-
-ani = animation.FuncAnimation(fig, update, frames=len(redshifts), interval=500, blit=True)
-
-# Save as mp4
-os.makedirs("animations", exist_ok=True)
-ani.save("animations/sfrd_vs_redshift.mp4", writer="ffmpeg", dpi=200)
-print("✅ Saved: sfrd_vs_redshift.png and sfrd_vs_redshift.mp4")
+print(f"Done! All plots saved in '{OUTPUT_FOLDER}/' folder.")
