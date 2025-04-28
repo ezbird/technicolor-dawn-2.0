@@ -1,5 +1,5 @@
 % Parameters for Technicolor Dawn v2
-% new parameters must be updated in allvars.cc and allvars.h
+% NOTE: new parameters must be updated in allvars.cc and allvars.h
 
 %----  Relevant files 
 InitCondFile         ICs/IC_gadget4_64_250kpc
@@ -98,9 +98,9 @@ MinimumComovingHydroSoftening 0.001
 
 %----- SPH
 ArtBulkViscConst             1.0
-MinEgySpec                   5     ; in code units, 5= ~350K, Prevents gas from cooling below this specific internal energy floor (units are energy per unit mass).
-InitGasTemp                  400   ; in Kelvin, Sets the initial gas temperature, if not provided in the ICs.
-ViscosityAlphaMin            0.2   ; minimum viscosity coefficient 
+MinEgySpec                   5          ; in code units, 5  ~350K, Prevents gas from cooling below this specific internal energy floor (units are energy per unit mass).
+InitGasTemp                  462.77046  ; in Kelvin, Sets the initial gas temperature, if not provided in the ICs.
+ViscosityAlphaMin            0.2        ; minimum viscosity coefficient 
 
 %----- Star formation
 StarformationMode     1
