@@ -2,7 +2,7 @@
 % NOTE: new parameters must be updated in allvars.cc and allvars.h
 
 %----  Relevant files 
-InitCondFile         ICs/IC_gadget4_64_250kpc
+InitCondFile         ICs/IC_gadget4_32_100kpc
 OutputDir            ./output
 SnapshotFileBase     snapshot
 OutputListFilename   empty.txt
@@ -12,8 +12,8 @@ ICFormat             3
 SnapFormat           3 
 
 %---- CPU-time limits
-TimeLimitCPU              86400   % 24h, in seconds
-CpuTimeBetRestartFile     7200    % 2h,  in seconds
+TimeLimitCPU              175000   % 86400 = 24h, in seconds
+CpuTimeBetRestartFile     7200     % 2h,  in seconds
 
 %----- Memory allocation
 MaxMemSize                1200    % in MByte
@@ -46,7 +46,7 @@ MaxFilesWithConcurrentIO  1
 ErrTolIntAccuracy        0.02 
 CourantFac               0.15
 MaxSizeTimestep          0.05
-MinSizeTimestep          0.0
+MinSizeTimestep          1e-07
 
 %---- Tree algorithm, force accuracy, domain update frequency
 TypeOfOpeningCriterion                1
@@ -57,8 +57,8 @@ TopNodeFactor                         3.0
 ActivePartFracForNewDomainDecomp      0.01
 
 %---- Initial density estimate
-DesNumNgb                        20   ; should be 33 or higher with a bigger volume! lowering now for test runs
-MaxNumNgbDeviation               1 
+DesNumNgb                        33   ; adjust each particle's smoothing length h (for dens, press, temp) until it finds this many neighbors
+MaxNumNgbDeviation               3    ; tolerance around the desired number of neighbors(i.e. +/- around DesNumNgb)
 
 %---- System of units
 UnitLength_in_cm         3.085678e21        ;  Mpc / h is 3.085678e24; 1.0 kpc / h is 3.085678e21
@@ -105,16 +105,16 @@ ViscosityAlphaMin            0.2        ; minimum viscosity coefficient
 %----- Star formation
 StarformationMode     1
 MetalYield            0.02
-MaxSfrTimescale       1.0         % usually 1.5; Gas consumption timescale (multi-phase model)
+MaxSfrTimescale       2.7        % usually 1.5; Gas consumption timescale (multi-phase model)
 MaxStarFormationTemp  15000      % only form stars where T < 15000 K
-FactorSN              0.1        % beta, mass fraction of massive stars (multi-phase model)
-FactorEVP             500        % A_0, evaporation parameter (multi-phase model); smaller value means lower pressure support, making it easier for gas to collapse
-TempSupernova         1e8         % T_SN, effective "supernova temperature",sets feedback energy (multi-phase model)
-TempClouds            500        % temperature of cold clouds (multi-phase model)
+FactorSN              0.193      % beta, mass fraction of massive stars (multi-phase model)
+FactorEVP             1000       % A_0, evaporation parameter (multi-phase model); smaller value means lower pressure support, making it easier for gas to collapse
+TempSupernova         1e8        % T_SN, effective "supernova temperature",sets feedback energy (multi-phase model)
+TempClouds            1000       % temperature of cold clouds (multi-phase model)
 CritOverDensity       100        % overdensity threshold value for cosmological sims; lower value means conditions easier to reach for SF
 CritPhysDensity       0          % critical physical density for star formation (in cm^(-3))
 PhysDensThresh        0.0
-CritHydrogenDensity   0.1      % only form stars where n_H > 0.1 cm^-3
+CritHydrogenDensity   0.1        % only form stars where n_H > 0.1 cm^-3
 TreecoolFile        data/TREECOOL
 
 % ---- Wind

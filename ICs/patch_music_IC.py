@@ -11,8 +11,11 @@ import numpy as np
 import shutil
 
 # Input and output file paths
-infile = "IC_gadget3_64_250kpc.hdf5"
-outfile = "IC_gadget4_64_250kpc.hdf5"
+infile = "IC_gadget3_32_100kpc.hdf5"
+outfile = "IC_gadget4_32_100kpc.hdf5"
+
+# Add a uniform InternalEnergy value to gas particles (PartType0)
+u_gas = 5  # Internal energy in Gadget units
 
 # Create a copy of the input file so we don't modify the original
 shutil.copy(infile, outfile)
@@ -53,8 +56,6 @@ with h5py.File(outfile, "r+") as f:
     f['Header'].attrs['MassTable'] = fixed
     print(f"Fixed MassTable: {mt} → {fixed}")
 
-# Add a uniform InternalEnergy value to gas particles (PartType0)
-u_gas = 200  # Internal energy in Gadget units
 with h5py.File(outfile, "r+") as f:
     if 'PartType0' in f:
         N = f['PartType0']['Coordinates'].shape[0]
