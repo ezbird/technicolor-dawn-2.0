@@ -12,11 +12,11 @@ ICFormat             3
 SnapFormat           3 
 
 %---- CPU-time limits
-TimeLimitCPU              175000   % 86400 = 24h, in seconds
-CpuTimeBetRestartFile     7200     % 2h,  in seconds
+TimeLimitCPU              175000     % 86400 = 24h, in seconds
+CpuTimeBetRestartFile     7200       % 2h,  in seconds
 
 %----- Memory allocation
-MaxMemSize                1200    % in MByte
+MaxMemSize                1200       % in MByte
 
 %---- Characteristics of run
 TimeBegin                 0.015625   % Begin of the simulation, z = 63
@@ -40,7 +40,6 @@ TimeOfFirstSnapshot       0.02
 TimeBetStatistics         0.5
 NumFilesPerSnapshot       1
 MaxFilesWithConcurrentIO  1
-
 
 %---- Accuracy of time integration
 ErrTolIntAccuracy        0.02 
@@ -98,20 +97,20 @@ MinimumComovingHydroSoftening 0.001
 
 %----- SPH
 ArtBulkViscConst             1.0
-MinEgySpec                   5          ; in code units, 5  ~350K, Prevents gas from cooling below this specific internal energy floor (units are energy per unit mass).
+MinEgySpec                   2          ; in code units, 5  ~350K, Prevents gas from cooling below this specific internal energy floor (units are energy per unit mass).
 InitGasTemp                  462.77046  ; in Kelvin, Sets the initial gas temperature, if not provided in the ICs.
 ViscosityAlphaMin            0.2        ; minimum viscosity coefficient 
 
 %----- Star formation
 StarformationMode     1
 MetalYield            0.02
-MaxSfrTimescale       2.7        % usually 1.5; Gas consumption timescale (multi-phase model)
+MaxSfrTimescale       1.5        % usually 1.5; Gas consumption timescale (multi-phase model)
 MaxStarFormationTemp  15000      % only form stars where T < 15000 K
 FactorSN              0.193      % beta, mass fraction of massive stars (multi-phase model)
 FactorEVP             1000       % A_0, evaporation parameter (multi-phase model); smaller value means lower pressure support, making it easier for gas to collapse
 TempSupernova         1e8        % T_SN, effective "supernova temperature",sets feedback energy (multi-phase model)
 TempClouds            1000       % temperature of cold clouds (multi-phase model)
-CritOverDensity       100        % overdensity threshold value for cosmological sims; lower value means conditions easier to reach for SF
+CritOverDensity       57.7        % default is 57.7; overdensity threshold value for cosmological sims; lower value means conditions easier to reach for SF
 CritPhysDensity       0          % critical physical density for star formation (in cm^(-3))
 PhysDensThresh        0.0
 CritHydrogenDensity   0.1        % only form stars where n_H > 0.1 cm^-3

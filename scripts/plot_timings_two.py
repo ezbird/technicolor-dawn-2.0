@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Path to your timings.txt
-timings_file = '../output//timings.txt'
+timings_file = '../output/timings.txt'
+
 
 # Lists to store extracted data
 steps = []
