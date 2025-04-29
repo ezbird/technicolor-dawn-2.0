@@ -3,12 +3,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import glob
+from matplotlib.colors import LogNorm
 
 # Constants
 k_B = 1.380649e-16     # Boltzmann constant in erg/K
-m_H = 1.6735575e-24    # Mass of hydrogen atom in g
+m_H = 1.6735575e-24     # Mass of hydrogen atom in g
 mu = 0.6               # Mean molecular weight for fully ionized gas
-gamma = 5.0 / 3.0      # Adiabatic index for monoatomic gas
+gamma = 5.0 / 3.0       # Adiabatic index for monoatomic gas
 
 # Gather snapshot files
 snapshots = sorted(glob.glob("../output/snapshot_*.hdf5"))
@@ -21,36 +22,48 @@ for snapfile in snapshots:
     with h5py.File(snapfile, "r") as snap:
         header = dict(snap["Header"].attrs)
         a = header["Time"]
-        
+
         # Unit conversions
         UnitMass = 1.989e43       # grams per code mass unit
         UnitLen = 3.085678e24     # cm per code length unit
         UnitVel = 1e5             # cm/s per code velocity unit
-        
+
         # Load gas data
         rho_code = np.array(snap["PartType0/Density"]) * a**3
         rho_cgs = rho_code * (UnitMass / UnitLen**3)
-        
+
         u_code = np.array(snap["PartType0/InternalEnergy"])
         u_cgs = u_code * UnitVel**2  # erg/g
-        
+
         # Compute temperature
         T = u_cgs * (gamma - 1.0) * mu * m_H / k_B
-        
+
+        # Apply cuts to remove irrelevant gas
+        mask = (rho_cgs > 1e-30) & (T > 10)
+        rho_cgs_cut = rho_cgs[mask]
+        T_cut = T[mask]
+
         # Plot
         fig, ax = plt.subplots(figsize=(8,7))
-        scatter = ax.scatter(rho_cgs, T, c=np.log10(T), cmap='plasma', s=3, alpha=0.7)
-        ax.set_xscale('log')
-        ax.set_yscale('log')
-        ax.set_xlabel("Density [g/cm³]")
-        ax.set_ylabel("Temperature [K]")
+
+        # 2D histogram with log normalization
+        h = ax.hist2d(
+            np.log10(rho_cgs_cut),
+            np.log10(T_cut),
+            bins=200,
+            cmap='plasma',
+            norm=LogNorm()
+        )
+
+        ax.set_xlabel("log10(Density [g/cm³])")
+        ax.set_ylabel("log10(Temperature [K])")
         snapname = os.path.basename(snapfile)
-        ax.set_title(f"ρ–T Diagram\n{snapname} (a={a:.4f})")
+        ax.set_title(f"\u03c1–T Diagram (hist2d)\n{snapname} (a={a:.4f})")
         ax.grid(True, which="both", ls="--", alpha=0.3)
-        
-        # Add colorbar
-        cbar = plt.colorbar(scatter, ax=ax)
-        cbar.set_label('log10(Temperature [K])')
+
+        # Colorbar
+        cbar = plt.colorbar(h[3], ax=ax)
+        cbar.set_label('Gas Count (log scale)')
 
         plt.tight_layout()
         savepath = os.path.join(output_dir, f"{snapname}.png")
