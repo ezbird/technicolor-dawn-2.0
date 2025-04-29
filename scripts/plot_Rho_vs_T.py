@@ -43,10 +43,13 @@ for snapfile in snapshots:
         rho_cgs_cut = rho_cgs[mask]
         T_cut = T[mask]
 
+        # Check if there is anything to plot
+        if len(rho_cgs_cut) == 0 or len(T_cut) == 0:
+            print(f"[WARNING] No valid gas to plot in {snapfile}. Skipping.")
+            continue
+
         # Plot
         fig, ax = plt.subplots(figsize=(8,7))
-
-        # 2D histogram with log normalization
         h = ax.hist2d(
             np.log10(rho_cgs_cut),
             np.log10(T_cut),
@@ -54,6 +57,7 @@ for snapfile in snapshots:
             cmap='plasma',
             norm=LogNorm()
         )
+
 
         ax.set_xlabel("log10(Density [g/cm³])")
         ax.set_ylabel("log10(Temperature [K])")
