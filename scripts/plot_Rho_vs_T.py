@@ -39,7 +39,7 @@ for snapfile in snapshots:
         T = u_cgs * (gamma - 1.0) * mu * m_H / k_B
 
         # Apply cuts to remove irrelevant gas
-        mask = (rho_cgs > 1e-35) & (T > 10)
+        mask = (rho_cgs > 1e-45) & (T > 150)
         rho_cgs_cut = rho_cgs[mask]
         T_cut = T[mask]
 
