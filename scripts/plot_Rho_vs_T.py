@@ -25,7 +25,7 @@ for snapfile in snapshots:
 
         # Unit conversions
         UnitMass = 1.989e43       # grams per code mass unit
-        UnitLen = 3.085678e24     # cm per code length unit
+        UnitLen = 3.085678e21     # cm per code length unit
         UnitVel = 1e5             # cm/s per code velocity unit
 
         # Load gas data
@@ -39,7 +39,7 @@ for snapfile in snapshots:
         T = u_cgs * (gamma - 1.0) * mu * m_H / k_B
 
         # Apply cuts to remove irrelevant gas
-        mask = (rho_cgs > 1e-40) & (T > 10)
+        mask = (rho_cgs > 1e-35) & (T > 10)
         rho_cgs_cut = rho_cgs[mask]
         T_cut = T[mask]
 
@@ -59,10 +59,10 @@ for snapfile in snapshots:
         )
 
 
-        ax.set_xlabel("log10(Density [g/cm³])")
-        ax.set_ylabel("log10(Temperature [K])")
+        ax.set_xlabel("log10(Density (g/cm³))")
+        ax.set_ylabel("log10(Temperature (K))")
         snapname = os.path.basename(snapfile)
-        ax.set_title(f"\u03c1–T Diagram (hist2d)\n{snapname} (a={a:.4f})")
+        ax.set_title(f"\u03c1–T\n{snapname} (a={a:.4f})")
         ax.grid(True, which="both", ls="--", alpha=0.3)
 
         # Colorbar
