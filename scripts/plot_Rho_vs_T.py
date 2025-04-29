@@ -3,7 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 import glob
-import matplotlib.animation as animation
 
 # Constants
 k_B = 1.380649e-16     # Boltzmann constant in erg/K
@@ -14,22 +13,21 @@ gamma = 5.0 / 3.0      # Adiabatic index for monoatomic gas
 # Gather snapshot files
 snapshots = sorted(glob.glob("../output/snapshot_*.hdf5"))
 
-fig, ax = plt.subplots(figsize=(7, 6))
-sc = None
+# Output directory for PNGs
+output_dir = "rho_T_frames"
+os.makedirs(output_dir, exist_ok=True)
 
-# Preload data for animation
-snapshot_data = []
 for snapfile in snapshots:
     with h5py.File(snapfile, "r") as snap:
         header = dict(snap["Header"].attrs)
         a = header["Time"]
         
-        # Unit conversions from header
-        UnitMass = 1.989e43        # grams per code mass unit
-        UnitLen = 3.085678e24       # cm per code length unit
-        UnitVel = 1e5  # cm/s per code velocity unit
+        # Unit conversions
+        UnitMass = 1.989e43       # grams per code mass unit
+        UnitLen = 3.085678e24     # cm per code length unit
+        UnitVel = 1e5             # cm/s per code velocity unit
         
-        # Load data: convert to cgs
+        # Load gas data
         rho_code = np.array(snap["PartType0/Density"]) * a**3
         rho_cgs = rho_code * (UnitMass / UnitLen**3)
         
@@ -39,31 +37,24 @@ for snapfile in snapshots:
         # Compute temperature
         T = u_cgs * (gamma - 1.0) * mu * m_H / k_B
         
-        # Debug prints
-        print(f"[INFO] Snapshot {snapfile}:")
-        print(f"  rho_cgs min/max: {rho_cgs.min():.2e} / {rho_cgs.max():.2e} g/cm³")
-        print(f"  u_cgs min/max:  {u_cgs.min():.2e} / {u_cgs.max():.2e} erg/g")
-        print(f"  T min/max:      {T.min():.2e} / {T.max():.2e} K")
+        # Plot
+        fig, ax = plt.subplots(figsize=(8,7))
+        scatter = ax.scatter(rho_cgs, T, c=np.log10(T), cmap='plasma', s=3, alpha=0.7)
+        ax.set_xscale('log')
+        ax.set_yscale('log')
+        ax.set_xlabel("Density [g/cm³]")
+        ax.set_ylabel("Temperature [K]")
+        snapname = os.path.basename(snapfile)
+        ax.set_title(f"ρ–T Diagram\n{snapname} (a={a:.4f})")
+        ax.grid(True, which="both", ls="--", alpha=0.3)
         
-        snapshot_data.append((rho_cgs, T, os.path.basename(snapfile)))
+        # Add colorbar
+        cbar = plt.colorbar(scatter, ax=ax)
+        cbar.set_label('log10(Temperature [K])')
 
-def update(frame):
-    rho, T, snapname = snapshot_data[frame]
-    ax.clear()
-    ax.loglog(rho, T, 'o', markersize=2, alpha=0.7)
-    ax.set_xlabel("Density [g/cm³]")
-    ax.set_ylabel("Temperature [K]")
-    ax.set_title(f"ρ–T diagram: {snapname}")
-    ax.grid(True, which="both", ls="--", alpha=0.3)
-    plt.tight_layout()
-    os.makedirs("rho_T_frames", exist_ok=True)
-    plt.savefig(f"rho_T_frames/{snapname}.png", dpi=150)
+        plt.tight_layout()
+        savepath = os.path.join(output_dir, f"{snapname}.png")
+        plt.savefig(savepath, dpi=150)
+        plt.close(fig)
 
-# Run animation
-ani = animation.FuncAnimation(fig, update, frames=len(snapshot_data), interval=500)
-
-plt.show()
-
-# Save animation as MP4
-ani.save("rho_T_animation.mp4", writer="ffmpeg", dpi=200)
-print("Animation saved as rho_T_animation.mp4")
+        print(f"[INFO] Saved {savepath}")
