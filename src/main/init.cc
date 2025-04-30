@@ -101,9 +101,10 @@ void sim::init(int RestartSnapNum)
 
   for(int i = 0; i < Sp.NumPart; i++) {
 
-    for (int k = 0; k < 4; k++)    /* Initialize metal arrays to 0 */
-      Sp.SphP[i].Metals[k] = 0.0;
-
+    #ifdef COOLING
+      for (int k = 0; k < 4; k++)    /* Initialize metal arrays to 0 */
+        Sp.SphP[i].Metals[k] = 0.0;
+    #endif
 
     if(All.MassTable[Sp.P[i].getType()] != 0)
       {
