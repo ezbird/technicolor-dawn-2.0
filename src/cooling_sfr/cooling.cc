@@ -138,6 +138,14 @@
 
     u *= All.UnitDensity_in_cgs / All.UnitPressure_in_cgs; /* to internal units */
 
+    /* Floor internal energy to match minimum temperature behavior of Gadget-3 */
+    double Tmin_K = 3000.0;  // Kelvin
+    double mu = (1 + 4.0 * yhelium) / (1.0 + yhelium + *ne_guess);
+    double u_floor = (BOLTZMANN / PROTONMASS) * Tmin_K / (GAMMA_MINUS1 * mu);
+
+    if (u < u_floor)
+        u = u_floor;
+
     // Debug: Print final value and change
     double final_u = u * All.UnitDensity_in_cgs / All.UnitPressure_in_cgs;
     double delta_u = final_u - u_input;
