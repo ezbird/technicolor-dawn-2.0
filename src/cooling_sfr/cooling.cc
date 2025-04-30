@@ -50,7 +50,8 @@ extern int CoolingOn;   // declared in allvars.h, loaded from param.txt
    // Save inputs for diagnostic
    double u_input = u_old;
  
-   // If cooling is turned off in param.txt, stop here
+   // If we want to skip cooling, turn this on
+   CoolingOn = 0;
    if(CoolingOn == 0)
       return u_old;
 
