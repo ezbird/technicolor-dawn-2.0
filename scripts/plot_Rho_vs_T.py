@@ -38,21 +38,11 @@ for snapfile in snapshots:
         # Compute temperature
         T = u_cgs * (gamma - 1.0) * mu * m_H / k_B
 
-        # Apply cuts to remove irrelevant gas
-        mask = (rho_cgs > 1e-45) & (T > 150)
-        rho_cgs_cut = rho_cgs[mask]
-        T_cut = T[mask]
-
-        # Check if there is anything to plot
-        if len(rho_cgs_cut) == 0 or len(T_cut) == 0:
-            print(f"[WARNING] No valid gas to plot in {snapfile}. Skipping.")
-            continue
-
         # Plot
         fig, ax = plt.subplots(figsize=(8,7))
         h = ax.hist2d(
-            np.log10(rho_cgs_cut),
-            np.log10(T_cut),
+            np.log10(rho_cgs),
+            np.log10(T),
             bins=200,
             cmap='plasma',
             norm=LogNorm()
