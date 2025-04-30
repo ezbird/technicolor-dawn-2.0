@@ -23,6 +23,8 @@
 #include "../data/macros.h"
 #include "../io/parameters.h"
 
+extern int CoolingOn;
+
 /** Data which is the SAME for all tasks (mostly code parameters read
  * from the parameter file).  Holding this data in a structure is
  * convenient for writing/reading the restart file, and it allows the
@@ -39,7 +41,7 @@ struct global_data_all_processes : public parameters
   double AvgType1Mass;
 #endif
 
-  extern int CoolingOn;
+
 
   double TopNodeFactor;
 
