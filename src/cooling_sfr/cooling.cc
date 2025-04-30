@@ -130,17 +130,19 @@
     }
   while(fabs(du / u) > 1.0e-6 && iter < MAXITER);
 
-  if(iter >= MAXITER)
+  if(iter >= MAXITER) {
     Terminate(
         "failed to converge in DoCooling(): DoCool->u_old_input=%g\nDoCool->rho_input= %g\nDoCool->dt_input= "
         "%g\nDoCool->ne_guess_input= %g\n",
         DoCool->u_old_input, DoCool->rho_input, DoCool->dt_input, DoCool->ne_guess_input);
+    }
 
     u *= All.UnitDensity_in_cgs / All.UnitPressure_in_cgs; /* to internal units */
 
     /* Floor internal energy to match minimum temperature behavior of Gadget-3 */
     double Tmin_K = 3000.0;  // Kelvin
-    double mu = (1 + 4.0 * yhelium) / (1.0 + yhelium + *ne_guess);
+    double yhelium = coolinfo->He_frac;  // this is the helium mass fraction
+    double mu = (1.0 + 4.0 * yhelium) / (1.0 + yhelium + *ne_guess);
     double u_floor = (BOLTZMANN / PROTONMASS) * Tmin_K / (GAMMA_MINUS1 * mu);
 
     if (u < u_floor)
@@ -148,7 +150,7 @@
 
     // Debug: Print final value and change
     double final_u = u * All.UnitDensity_in_cgs / All.UnitPressure_in_cgs;
-    double delta_u = final_u - u_input;
+    //double delta_u = final_u - u_input;
     //mpi_printf("DOCOOLING: u_old=%g u_new=%g delta_u=%g LambdaNet=%g\n", u_input, final_u, delta_u, LambdaNet);
   
     return final_u;
