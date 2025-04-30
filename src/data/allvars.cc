@@ -174,6 +174,9 @@ void global_data_all_processes::register_parameters(void)
   add_param("TreecoolFile", TreecoolFile, PARAM_STRING, PARAM_CHANGEABLE);
 #endif
 
+add_param("StarformationMode", &StarformationMode, PARAM_INT, PARAM_FIXED);
+add_param("CoolingOn", &CoolingOn, PARAM_INT, PARAM_FIXED);
+
 #ifdef STARFORMATION
   add_param("CritOverDensity", &CritOverDensity, PARAM_DOUBLE, PARAM_FIXED);
   add_param("CritPhysDensity", &CritPhysDensity, PARAM_DOUBLE, PARAM_FIXED);
@@ -185,7 +188,7 @@ void global_data_all_processes::register_parameters(void)
   add_param("MaxSfrTimescale", &MaxSfrTimescale, PARAM_DOUBLE, PARAM_FIXED);
   add_param("MaxStarFormationTemp", &MaxStarFormationTemp, PARAM_DOUBLE, PARAM_FIXED);
   add_param("MetalYield", &MetalYield, PARAM_DOUBLE, PARAM_FIXED);
-  add_param("StarformationMode", &StarformationMode, PARAM_INT, PARAM_FIXED);
+  
 
   add_param("WindEfficiency", &WindEfficiency, PARAM_DOUBLE, PARAM_FIXED);
   add_param("WindEnergyFraction", &WindEnergyFraction, PARAM_DOUBLE, PARAM_FIXED);

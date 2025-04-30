@@ -39,6 +39,8 @@ struct global_data_all_processes : public parameters
   double AvgType1Mass;
 #endif
 
+  extern int CoolingOn;
+
   double TopNodeFactor;
 
   int ICFormat; /**< selects different versions of IC file-format */

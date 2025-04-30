@@ -101,6 +101,8 @@ MinEgySpec                   2          ; in code units, 5  ~350K, Prevents gas 
 InitGasTemp                  462.77046  ; in Kelvin, Sets the initial gas temperature, if not provided in the ICs.
 ViscosityAlphaMin            0.2        ; minimum viscosity coefficient 
 
+CoolingOn = 1
+
 %----- Star formation
 StarformationMode     1
 MetalYield            0.02

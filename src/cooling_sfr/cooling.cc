@@ -30,6 +30,8 @@
 #include "../system/system.h"
 #include "../time_integration/timestep.h"
 
+extern int CoolingOn;   // declared in allvars.h, loaded from param.txt
+
 /** \brief Compute the new internal energy per unit mass.
  *
  *   The function solves for the new internal energy per unit mass of the gas by integrating the equation
@@ -47,7 +49,12 @@
  {
    // Save inputs for diagnostic
    double u_input = u_old;
-   
+ 
+   // If cooling is turned off in param.txt, stop here
+   if(CoolingOn == 0)
+      return u_old;
+
+
    DoCool->u_old_input    = u_old;
    DoCool->rho_input      = rho;
    DoCool->dt_input       = dt;
