@@ -141,8 +141,8 @@
 
     /* Floor internal energy to match minimum temperature behavior of Gadget-3 */
     double Tmin_K = 3000.0;  // Kelvin
-    double yhelium = coolinfo->He_frac;  // this is the helium mass fraction
-    double mu = (1.0 + 4.0 * yhelium) / (1.0 + yhelium + *ne_guess);
+    
+    double mu = (1.0 + 4.0 * gs->yhelium) / (1.0 + gs->yhelium + *ne_guess);
     double u_floor = (BOLTZMANN / PROTONMASS) * Tmin_K / (GAMMA_MINUS1 * mu);
 
     if (u < u_floor)
