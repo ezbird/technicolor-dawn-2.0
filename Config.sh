@@ -90,7 +90,7 @@ TIMEDEP_ART_VISC                             # enables time dependend viscosity 
 #--------------------------------------- Extra physics
 
 #COOLING                                      # Enables radiative atomic cooling by hydrogen and helium
-STARFORMATION                                # Enables star formation with the Springel & Hernquist (2003) model
+#STARFORMATION                                # Enables star formation with the Springel & Hernquist (2003) model
 #DUST
 #SUPERNOVA
 #FEEDBACK
