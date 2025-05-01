@@ -9,23 +9,31 @@
 #include <string.h>
 #include <cmath>
 
+#include "../cooling_sfr/cooling.h"
 #include "../data/allvars.h"
 #include "../data/dtypes.h"
-#include "../data/intposconvert.h"
 #include "../data/mymalloc.h"
-#include "../domain/domain.h"
+#include "../data/simparticles.h"
+#include "../fmm/fmm.h"
+#include "../fof/fof.h"
+#include "../gitversion/version.h"
 #include "../gravity/ewald.h"
-#include "../gravity/grav_forcetest.h"
 #include "../gravtree/gravtree.h"
+#include "../io/hdf5_util.h"
+#include "../io/io.h"
+#include "../io/parameters.h"
+#include "../lightcone/lightcone.h"
 #include "../logs/logs.h"
 #include "../logs/timer.h"
 #include "../main/main.h"
 #include "../main/simulation.h"
-#include "../mpi_utils/generic_comm.h"
+#include "../mergertree/mergertree.h"
 #include "../mpi_utils/mpi_utils.h"
+#include "../mpi_utils/shared_mem_handler.h"
 #include "../ngbtree/ngbtree.h"
 #include "../pm/pm.h"
 #include "../system/system.h"
+#include "../time_integration/driftfac.h"
 #include "../time_integration/timestep.h"
 #include "../data/constants.h"
 
@@ -46,6 +54,7 @@ static double mhboltz;
 #define TABLESIZE 500
 #define NCOOLTAB  2000
 #define XH 0.76
+#define SMALLNUM 1.0e-40
 
 static double BetaH0[NCOOLTAB], BetaHep[NCOOLTAB], Betaff[NCOOLTAB];
 static double AlphaHp[NCOOLTAB], AlphaHep[NCOOLTAB], AlphaHepp[NCOOLTAB], Alphad[NCOOLTAB];
@@ -250,6 +259,62 @@ void coolsfr::IonizeParamsTable()
     epsH0  = interpolate(eH0[ilow],  eH0[ilow + 1]);
     epsHe0 = interpolate(eHe[ilow],  eHe[ilow + 1]);
     epsHep = interpolate(eHep[ilow], eHep[ilow + 1]);
+}
+
+
+void MakeRadTab()
+{
+    int irho, itemp;
+    double logT, rho, dT, drho;
+    double ne;
+    double redshift;
+
+    redshift = 1.0 / All.Time - 1.0;
+
+    // Check if the background or redshift changed significantly
+    if (std::fabs(gJH0_old - gJH0) / (gJH0 + SMALLNUM) < 0.01 &&
+        std::fabs(redshift - redshift_old) < 1.0)
+        return;
+
+    drho = (rhomax - rhomin) / NRHOTAB;
+    dT = (Tmax - Tmin) / NTEMPTAB;
+    drhoinv = 1.0 / drho;
+    dTinv = 1.0 / dT;
+
+    // Fill the interpolation arrays
+    for (irho = 0; irho < NRHOTAB; ++irho)
+        rhoarray[irho] = drho * irho + rhomin;
+
+    for (itemp = 0; itemp < NTEMPTAB; ++itemp)
+        Tarray[itemp] = dT * itemp + Tmin;
+
+    // Populate the cooling and electron density tables
+    ne = 0.0;
+    nH0 = nHe0 = 1.0;
+    nHep = nHepp = 0.0;
+
+    for (irho = 0; irho < NRHOTAB; ++irho)
+    {
+        rho = std::pow(10.0, irho * drho + rhomin);
+
+        for (itemp = 0; itemp < NTEMPTAB; ++itemp)
+        {
+            logT = itemp * dT + Tmin;
+            find_abundances_and_rates(logT, rho, &ne);
+            neTable[irho][itemp] = ne;
+            coolTable[irho][itemp] = CoolingRate(logT, rho, ne, EQUILIBRIUM_IONIZED);
+        }
+    }
+
+    if (ThisTask == 0 && npcool > 0)
+        printf("average cooling iterations = %g (%d particles cooled)\n", 1.0 * itercool / npcool, npcool);
+
+    if (ThisTask == 0)
+        printf("Made New Cooling Table at z = %g (dJH0 = %g)\n", redshift, std::fabs(gJH0_old - gJH0) / (gJH0 + SMALLNUM));
+
+    npcool = itercool = 0;
+    gJH0_old = gJH0;
+    redshift_old = redshift;
 }
 
 
