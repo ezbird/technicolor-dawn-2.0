@@ -72,6 +72,28 @@ extern void IonizeParams();
 extern void MakeCoolingTable();
 extern double convert_u_to_temp(double u, double rho, double *ne_guess);
 
+void coolsfr::endrun()
+{
+  mpi_printf("endrun called, calling MPI_Finalize()\nbye!\n\n");
+  fflush(stdout);
+
+  if(Shmem.Island_ThisTask == 0 && Shmem.Island_NTask != Shmem.World_NTask)
+    {
+      char c = 0;
+      // need to send this flag to our shared memory rank so that it also ends itself
+      MPI_Send(&c, 1, MPI_BYTE, Shmem.MyShmRankInGlobal, TAG_KEY, MPI_COMM_WORLD);
+    }
+
+  /* The hdf5 library will sometimes register an atexit() handler that calls its error handler.
+   * This is set to my_hdf_error_handler, which calls MPI_Abort.
+   * Calling MPI_Abort after MPI_Finalize is not allowed.
+   * Hence unset the HDF error handler here*/
+  H5Eset_auto(H5E_DEFAULT, NULL, NULL);
+
+  MPI_Finalize();
+  exit(0);
+}
+
 void coolsfr::InitCool()
 {
   ReadIonizeParams("TREECOOL");

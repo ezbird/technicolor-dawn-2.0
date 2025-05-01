@@ -112,6 +112,7 @@ void global_data_all_processes::register_parameters(void)
   add_param("TimeLimitCPU", &TimeLimitCPU, PARAM_DOUBLE, PARAM_CHANGEABLE);
 
   add_param("InitGasTemp", &InitGasTemp, PARAM_DOUBLE, PARAM_FIXED);
+  add_param("MinGasTemp", &MinGasTemp, PARAM_DOUBLE, PARAM_FIXED);
   add_param("MinEgySpec", &MinEgySpec, PARAM_DOUBLE, PARAM_CHANGEABLE);
 
   for(int i = 0; i < NSOFTCLASSES; i++)
