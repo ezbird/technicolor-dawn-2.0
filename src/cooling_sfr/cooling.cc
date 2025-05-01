@@ -629,6 +629,13 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
         unew = All.MinEgySpec;
     }
     
+    // Limit maximum energy change per step to prevent timestep issues
+    double max_change_factor = 2.0;  // Allow at most doubling/halving of energy per step
+    if(unew > max_change_factor * u_old)
+        unew = max_change_factor * u_old;
+    else if(unew < u_old / max_change_factor)
+        unew = u_old / max_change_factor;
+
     // Update particle properties
     Sp->SphP[i].Ne = ne;
     
