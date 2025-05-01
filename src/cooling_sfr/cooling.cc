@@ -97,16 +97,25 @@ void coolsfr::InitCool()
   IonizeParams();
   
   if(ThisTask == 0) {
-    // Convert a reasonable temperature to code units
-    double temp_desired = 462.0;  // 1000K is a reasonable starting point
+    // Calculate energy for 462K temperature correctly
+    double temp_desired = 462.0;  // Desired temperature
     double mean_weight = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);
-    double u_phys = temp_desired * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mean_weight);
-    double u_code = u_phys * All.UnitEnergy_in_cgs / All.UnitMass_in_g;
     
+    // Calculate physical specific energy (erg/g)
+    double u_phys = BOLTZMANN * temp_desired / (mean_weight * PROTONMASS * GAMMA_MINUS1);
+    
+    // Convert to code units
+    double u_code = u_phys / (All.UnitVelocity_in_cm_per_s * All.UnitVelocity_in_cm_per_s);
+    
+    // Print the correctly calculated values
     mpi_printf("COOLING: For a temperature of %g K, the internal energy should be %g in code units\n", 
                temp_desired, u_code);
-    mpi_printf("COOLING: Current IC value of 5.0 corresponds to roughly %g K\n", 
-               5.0 * All.UnitMass_in_g / All.UnitEnergy_in_cgs * GAMMA_MINUS1 * PROTONMASS * mean_weight / BOLTZMANN);
+    
+    // Calculate what the current IC value corresponds to
+    double current_temp = 5.0 * (All.UnitVelocity_in_cm_per_s * All.UnitVelocity_in_cm_per_s) 
+                         * mean_weight * PROTONMASS * GAMMA_MINUS1 / BOLTZMANN;
+    
+    mpi_printf("COOLING: Current IC value of 5.0 corresponds to roughly %g K\n", current_temp);
     mpi_printf("COOLING: Cooling tables initialized successfully.\n");
 }
 

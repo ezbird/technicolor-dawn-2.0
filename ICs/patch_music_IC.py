@@ -15,7 +15,10 @@ infile = "IC_gadget3_32_100kpc.hdf5"
 outfile = "IC_gadget4_32_100kpc.hdf5"
 
 # Add a uniform InternalEnergy value to gas particles (PartType0)
-u_gas = 5  # Internal energy in Gadget units
+# A value of 5 would be T = 5 × (5.0 × 10^-10) × (2/3) × 1.67 × 10^-24 × 1.22 / 1.38 × 10^-16 ≈ 50,000K
+# A value of 0.01 would be ~100K
+# A value of 0.1 would be ~1000K
+u_gas = 0.05  # Internal energy in Gadget units
 
 # Create a copy of the input file so we don't modify the original
 shutil.copy(infile, outfile)
