@@ -37,7 +37,7 @@
  #include "../logs/timer.h"
  #include "../system/system.h"
  #include "../time_integration/timestep.h"
- 
+
   // Debug output function
   #define SF_PRINT(...) \
     do { if (All.StarFormationDebug) printf(__VA_ARGS__); } while (0)

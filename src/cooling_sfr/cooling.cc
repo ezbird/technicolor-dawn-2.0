@@ -17,6 +17,7 @@
 #include "../logs/timer.h"
 #include "../system/system.h"
 #include "../time_integration/timestep.h"
+#include "../data/constants.h"
 
 #define RHO_TABLE_SIZE 200
 #define TEMP_TABLE_SIZE 200
@@ -28,6 +29,12 @@ static double Tmax = 9.0;
 static double RhoMin = -8.0;
 static double RhoMax = 4.0;
 static double dlogT, dlogRho;
+static double yhelium;
+static double mhboltz;
+
+#define JAMPL 1.0
+#define TABLESIZE 500
+
 
 extern void ReadIonizeParams(const char *fname);
 extern void IonizeParams();
@@ -114,8 +121,8 @@ void coolsfr::MakeCoolingTable()
     const int N = NCOOLTAB;
     double T, Tfact;
 
-    this->yhelium = (1.0 - XH) / (4.0 * XH);
-    this->mhboltz = PROTONMASS / BOLTZMANN;
+    yhelium = (1.0 - XH) / (4.0 * XH);
+    mhboltz = PROTONMASS / BOLTZMANN;
 
     if (All.MinGasTemp > 0.0)
         this->Tmin = log10(All.MinGasTemp);
