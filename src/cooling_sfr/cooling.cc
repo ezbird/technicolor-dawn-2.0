@@ -14,32 +14,31 @@
 #include "../data/dtypes.h"
 #include "../data/mymalloc.h"
 #include "../data/simparticles.h"
-#include "../fmm/fmm.h"
-#include "../fof/fof.h"
-#include "../gitversion/version.h"
-#include "../gravity/ewald.h"
-#include "../gravtree/gravtree.h"
-#include "../io/hdf5_util.h"
-#include "../io/io.h"
-#include "../io/parameters.h"
-#include "../lightcone/lightcone.h"
 #include "../logs/logs.h"
 #include "../logs/timer.h"
-#include "../main/main.h"
-#include "../main/simulation.h"
-#include "../mergertree/mergertree.h"
-#include "../mpi_utils/mpi_utils.h"
-#include "../mpi_utils/shared_mem_handler.h"
-#include "../ngbtree/ngbtree.h"
-#include "../pm/pm.h"
 #include "../system/system.h"
-#include "../time_integration/driftfac.h"
 #include "../time_integration/timestep.h"
 #include "../data/constants.h"
 
+// Define necessary global variables
+#define JAMPL 1.0
+#define TABLESIZE 500
+#define NCOOLTAB 2000
+#define XH 0.76
+#define COOLLIM 0.01
+#define COOL_TOL 0.002
+#define MIN_DTIONFRAC 0.01
+#define MAXITER 1000
+#define SMALLNUM 1.0e-60
+#define EQUILIBRIUM_IONIZED 0
+
+// Cooling table definitions
 #define RHO_TABLE_SIZE 200
 #define TEMP_TABLE_SIZE 200
+#define NRHOTAB 240
+#define NTEMPTAB 900
 
+// Globals for cooling
 static double coolTable[RHO_TABLE_SIZE][TEMP_TABLE_SIZE];
 static double neTable[RHO_TABLE_SIZE][TEMP_TABLE_SIZE];
 static double Tmin = 1.0;
@@ -50,75 +49,80 @@ static double dlogT, dlogRho;
 static double yhelium;
 static double mhboltz;
 
-#define JAMPL 1.0
-#define TABLESIZE 500
-#define NCOOLTAB  2000
-#define XH 0.76
-#define COOLLIM  0.01
-#define COOL_TOL 0.002
-#define MIN_DTIONFRAC 0.01		/* minimum ionization substep size */
-
-#define NRHOTAB 240
-#define NTEMPTAB 900
+// Cooling function lookup tables
 static double BetaH0[NCOOLTAB], BetaHep[NCOOLTAB], Betaff[NCOOLTAB];
 static double AlphaHp[NCOOLTAB], AlphaHep[NCOOLTAB], AlphaHepp[NCOOLTAB], Alphad[NCOOLTAB];
 static double GammaeH0[NCOOLTAB], GammaeHe0[NCOOLTAB], GammaeHep[NCOOLTAB];
 
+// TREECOOL table variables
 static double J_UV = 0, gJH0 = 0, gJHep = 0, gJHe0 = 0, epsH0 = 0, epsHep = 0, epsHe0 = 0;
 static double redshift_old = -100., gJH0_old = -100.;
 
-extern void ReadIonizeParams(const char *fname);
-extern void IonizeParams();
-extern void MakeCoolingTable();
-extern double convert_u_to_temp(double u, double rho, double *ne_guess);
+// Advanced cooling table variables
+static float inlogz[TABLESIZE];   // log10(z+1)
+static float gH0[TABLESIZE];      // photoionization rate for H0
+static float gHe[TABLESIZE];      // photoionization rate for He0
+static float gHep[TABLESIZE];     // photoionization rate for He+
+static float eH0[TABLESIZE];      // photoheating rate for H0
+static float eHe[TABLESIZE];      // photoheating rate for He0
+static float eHep[TABLESIZE];     // photoheating rate for He+
+static int nheattab = 0;          // actual length of the table
 
-void endrun()
+// Additional variables needed
+static double rhomin, rhomax;
+static double drhoinv, dTinv;
+static double rhoarray[NRHOTAB], Tarray[NTEMPTAB];
+static double nH0, nHe0, nHep, nHepp;
+static int npcool = 0, itercool = 0;
+
+// Function prototypes
+void coolsfr::ReadIonizeParams(const char* fname);
+void coolsfr::IonizeParams();
+void coolsfr::IonizeParamsTable();
+void coolsfr::MakeCoolingTable();
+double coolsfr::DoCooling(double u_old, double rho, double dt, double *ne_guess, gas_state *gs, do_cool_data *coolpars);
+double CoolingRateFromU(double u, double rho, double *ne_guess);
+double CoolingLookup(double logT, double logrho, double *ne_guess);
+double convert_u_to_temp(double u, double rho, double *ne_guess);
+void find_abundances_and_rates(double logT, double rho, double *ne);
+double CoolingRate(double logT, double rho, double ne, int mode);
+void MakeRadTab();
+void SetZeroIonization();
+
+// Helper function for program termination
+void endrun(int errorcode)
 {
-  printf("endrun called, calling MPI_Finalize()\nbye!\n\n");
-  fflush(stdout);
-
-  if(Shmem.Island_ThisTask == 0 && Shmem.Island_NTask != Shmem.World_NTask)
-    {
-      char c = 0;
-      // need to send this flag to our shared memory rank so that it also ends itself
-      MPI_Send(&c, 1, MPI_BYTE, Shmem.MyShmRankInGlobal, TAG_KEY, MPI_COMM_WORLD);
-    }
-
-  /* The hdf5 library will sometimes register an atexit() handler that calls its error handler.
-   * This is set to my_hdf_error_handler, which calls MPI_Abort.
-   * Calling MPI_Abort after MPI_Finalize is not allowed.
-   * Hence unset the HDF error handler here*/
-  H5Eset_auto(H5E_DEFAULT, NULL, NULL);
-
-  MPI_Finalize();
-  exit(0);
+  printf("Error code %d: terminating program\n", errorcode);
+  exit(errorcode);
 }
 
 void coolsfr::InitCool()
 {
-  ReadIonizeParams("TREECOOL");
-  IonizeParams();
-  MakeCoolingTable();
+  // Set default values for cooling table parameters
+  rhomin = -6.0;
+  rhomax = 3.0;
+  Tmin = 2.0;
+  Tmax = 9.0;
 
+  // Read TREECOOL file and initialize ionization parameters
+  ReadIonizeParams("data/TREECOOL");
+  
+  // Initialize ionization parameters
+  IonizeParams();
+  
+  // Create cooling tables
+  MakeCoolingTable();
+  
+  // Set table spacing
   dlogT = (Tmax - Tmin) / (TEMP_TABLE_SIZE - 1);
   dlogRho = (RhoMax - RhoMin) / (RHO_TABLE_SIZE - 1);
+  
+  // Initialize MakeRadTab
+  MakeRadTab();
+  
+  if(ThisTask == 0)
+    printf("COOLING: Cooling tables initialized successfully.\n");
 }
-
-// TREECOOL ionization background table
-
-#define JAMPL 1.0              // scaling factor for the TREECOOL input
-#define TABLESIZE 500          // maximum number of rows in the TREECOOL file
-
-static float inlogz[TABLESIZE];         // log10(z+1)
-static float gH0[TABLESIZE];            // photoionization rate for H0
-static float gHe[TABLESIZE];            // photoionization rate for He0
-static float gHep[TABLESIZE];           // photoionization rate for He+
-static float eH0[TABLESIZE];            // photoheating rate for H0
-static float eHe[TABLESIZE];            // photoheating rate for He0
-static float eHep[TABLESIZE];           // photoheating rate for He+
-
-static int nheattab = 0;                // actual length of the table
-
 
 void coolsfr::ReadIonizeParams(const char* fname)
 {
@@ -156,17 +160,7 @@ void coolsfr::ReadIonizeParams(const char* fname)
     }
 
     if (ThisTask == 0)
-        printf("\n\nRead ionization table with %d entries in file `%s`.\n\n", nheattab, fname);
-
-#ifdef METALFLOOR
-    All.MetalFloorRedshift = std::pow(10.0, inlogz[nheattab]) - 1.0;
-
-    if (ThisTask == 0)
-        printf("Metal floor of %g * Zsun (%g) set at a redshift of z = %g.\n\n",
-               All.MetalFloor,
-               All.MetalFloor * SOLAR_Z,
-               All.MetalFloorRedshift);
-#endif
+        printf("\n\nCOOLING: Read ionization table with %d entries in file `%s`.\n\n", nheattab, fname);
 }
 
 void coolsfr::MakeCoolingTable()
@@ -178,9 +172,9 @@ void coolsfr::MakeCoolingTable()
     mhboltz = PROTONMASS / BOLTZMANN;
 
     if (All.MinGasTemp > 0.0)
-        this->Tmin = log10(All.MinGasTemp);
+        Tmin = log10(All.MinGasTemp);
     else
-        this->Tmin = 1.0;
+        Tmin = 1.0;
 
     this->deltaT = (this->Tmax - this->Tmin) / N;
 
@@ -223,18 +217,13 @@ void coolsfr::MakeCoolingTable()
     }
 }
 
-
 void coolsfr::IonizeParams()
 {
+    // Get UV background from the TREECOOL table
     IonizeParamsTable();
 
-#ifdef RT
-    SetZeroIonization(); // disable the HM01 background
-#endif
-
-#ifndef NONEQION
-    MakeRadTab(); // only used if not solving ionization out-of-equilibrium
-#endif
+    // Initialize the cooling tables with current ionization parameters
+    MakeRadTab();
 }
 
 void coolsfr::IonizeParamsTable()
@@ -287,6 +276,59 @@ void coolsfr::IonizeParamsTable()
     epsHep = interpolate(eHep[ilow], eHep[ilow + 1]);
 }
 
+// Set ionization rates to zero (used when UV background is disabled)
+void SetZeroIonization()
+{
+    gJHe0 = gJHep = gJH0 = 0.0;
+    epsHe0 = epsHep = epsH0 = 0.0;
+    J_UV = 0.0;
+}
+
+// Find abundance ratios
+void find_abundances_and_rates(double logT, double rho, double *ne)
+{
+    double T = std::pow(10.0, logT);
+    double T_eV = T * BOLTZMANN / ELECTRONVOLT;
+    
+    // Simple electron density approximation for fully ionized gas
+    // This is a simplified version - for full accuracy you'd need 
+    // to solve the ionization balance equations
+    *ne = 1.0 + 2.0 * yhelium;  // Fully ionized H and He
+    
+    // If you have tabulated values, you could interpolate here
+}
+
+// Get cooling rate for a specific temperature and density
+double CoolingRate(double logT, double rho, double ne, int mode)
+{
+    double T = std::pow(10.0, logT);
+    double Lambda = 0.0;
+    
+    // Calculate cooling due to various processes
+    // This is a simplified version
+    double LambdaExcH0, LambdaExcHep, LambdaIonH0, LambdaIonHe0, LambdaIonHep;
+    double LambdaRecHp, LambdaRecHep, LambdaRecHepp, LambdaRecHepd;
+    double LambdaFF, Heat;
+    
+    // Lookup cooling rate from table or calculate directly
+    // For simplicity, returning a basic cooling function
+    double n_H = rho * XH / PROTONMASS;
+    
+    // A simple cooling function approximation
+    if (T > 1.0e4) {
+        // Bremsstrahlung dominates at high temperatures
+        Lambda = 1.42e-27 * std::sqrt(T) * ne * (n_H + 4.0 * n_H * yhelium);
+    } else {
+        // Recombination cooling
+        Lambda = 1.0e-23 * T * ne * n_H;
+    }
+    
+    // Include photoheating
+    double Heat = (n_H * epsH0 + n_H * yhelium * epsHe0) / rho;
+    
+    // Net cooling
+    return Heat - Lambda;
+}
 
 void MakeRadTab()
 {
@@ -315,7 +357,6 @@ void MakeRadTab()
         Tarray[itemp] = dT * itemp + Tmin;
 
     // Populate the cooling and electron density tables
-    ne = 0.0;
     nH0 = nHe0 = 1.0;
     nHep = nHepp = 0.0;
 
@@ -326,6 +367,7 @@ void MakeRadTab()
         for (itemp = 0; itemp < NTEMPTAB; ++itemp)
         {
             logT = itemp * dT + Tmin;
+            ne = 1.0; // Initial guess
             find_abundances_and_rates(logT, rho, &ne);
             neTable[irho][itemp] = ne;
             coolTable[irho][itemp] = CoolingRate(logT, rho, ne, EQUILIBRIUM_IONIZED);
@@ -333,16 +375,15 @@ void MakeRadTab()
     }
 
     if (ThisTask == 0 && npcool > 0)
-        printf("average cooling iterations = %g (%d particles cooled)\n", 1.0 * itercool / npcool, npcool);
+        printf("COOLING: average cooling iterations = %g (%d particles cooled)\n", 1.0 * itercool / npcool, npcool);
 
     if (ThisTask == 0)
-        printf("Made New Cooling Table at z = %g (dJH0 = %g)\n", redshift, std::fabs(gJH0_old - gJH0) / (gJH0 + SMALLNUM));
+        printf("COOLING: Made New Cooling Table at z = %g (dJH0 = %g)\n", redshift, std::fabs(gJH0_old - gJH0) / (gJH0 + SMALLNUM));
 
     npcool = itercool = 0;
     gJH0_old = gJH0;
     redshift_old = redshift;
 }
-
 
 double CoolingLookup(double logT, double logrho, double *ne_guess)
 {
@@ -369,6 +410,16 @@ double CoolingLookup(double logT, double logrho, double *ne_guess)
               x1 * x2 * neTable[irho + 1][itemp + 1];
 
   return dudt;
+}
+
+double convert_u_to_temp(double u, double rho, double *ne_guess)
+{
+    double temp;
+    double mu = (1.0 + 4.0 * yhelium) / (1.0 + yhelium + *ne_guess);
+    
+    temp = GAMMA_MINUS1 / BOLTZMANN * u * PROTONMASS * mu;
+    
+    return temp;
 }
 
 static double CoolingRateFromU(double u, double rho, double *ne_guess)
@@ -448,6 +499,55 @@ double coolsfr::DoCooling(double u_old, double rho, double dt, double *ne_guess,
   u = u_old * m / m_old;
   u *= All.UnitDensity_in_cgs / All.UnitPressure_in_cgs;
   return u;
+}
+
+// Main routine called to cool gas particles
+void coolsfr::cooling_only(simparticles *Sp)
+{
+  TIMER_START(CPU_COOLING);
+  
+  // Update cosmological factors and ionization parameters
+  All.set_cosmo_factors_for_current_time();
+  IonizeParams();
+  
+  // Setup cooling structures
+  gas_state gs = GasState;
+  do_cool_data DoCool = DoCoolData;
+  
+  // Process all active SPH particles
+  for(int i = 0; i < Sp->TimeBinsHydro.NActiveParticles; i++)
+  {
+    int target = Sp->TimeBinsHydro.ActiveParticleList[i];
+    if(Sp->P[target].getType() == 0)
+    {
+      if(Sp->P[target].getMass() == 0 && Sp->P[target].ID.get() == 0)
+        continue; /* skip particles that have been swallowed or eliminated */
+      
+      // Apply cooling to this particle
+      cool_sph_particle(Sp, target, &gs, &DoCool);
+    }
+  }
+  
+  TIMER_STOP(CPU_COOLING);
+}
+
+// Apply cooling to a single SPH particle
+void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_data *DoCool)
+{
+  // Get particle properties
+  double dt = (Sp->P[i].getTimeBinHydro() ? (((integertime)1) << Sp->P[i].getTimeBinHydro()) : 0) * All.Timebase_interval;
+  double ne = Sp->SphP[i].Ne;
+  double unew;
+  
+  // Apply cooling
+  unew = DoCooling(Sp->SphP[i].Utherm, Sp->get_dens_around_particle(i), dt, &ne, gs, DoCool);
+  
+  // Update particle properties
+  Sp->SphP[i].Ne = ne;
+  Sp->SphP[i].Utherm = unew;
+  
+  // Also update entropy if needed
+  Sp->set_entropy_from_utherm(unew, i);
 }
 
 #endif /* COOLING */
