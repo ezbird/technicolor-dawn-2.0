@@ -662,4 +662,5 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
     }
 }
 
+
 #endif /* COOLING */

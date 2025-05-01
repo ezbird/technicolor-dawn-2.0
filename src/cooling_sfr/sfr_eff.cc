@@ -638,7 +638,47 @@
           total_star_count, 1.0 / All.Time - 1.0);
 
    // Debugging summary of the temperature distribution of your gas particles at each step when cooling is applied
-   debug_energy_evolution(Sp);
+   if(ThisTask == 0 && All.Time > 0.04) {
+    // Count particles in different temperature ranges
+    int count_cold = 0;   // T < 100K
+    int count_warm = 0;   // 100K < T < 10000K
+    int count_hot = 0;    // T > 10000K
+    int count_sf = 0;     // Star-forming particles
+    
+    double min_temp = 1e30;
+    double max_temp = 0;
+    double sum_temp = 0;
+    int count = 0;
+    
+    for(int i = 0; i < Sp->NumPart; i++) {
+        if(Sp->P[i].getType() == 0) {  // Gas particles
+            double ne = Sp->SphP[i].Ne;
+            double rho = Sp->SphP[i].Density;
+            double u = Sp->get_utherm_from_entropy(i);
+            
+            gas_state gs = GasState;
+            do_cool_data DoCool{};
+            double temp = convert_u_to_temp(u, rho, &ne, &gs, &DoCool);
+            
+            if(temp < 100) count_cold++;
+            else if(temp < 10000) count_warm++;
+            else count_hot++;
+            
+            if(Sp->SphP[i].Sfr > 0) count_sf++;
+            
+            min_temp = std::min(min_temp, temp);
+            max_temp = std::max(max_temp, temp);
+            sum_temp += temp;
+            count++;
+        }
+    }
+    
+    double mean_temp = (count > 0) ? sum_temp / count : 0;
+    
+    mpi_printf("ENERGY_STATS: z=%.3f Time=%.3e cold=%d warm=%d hot=%d sf=%d min_T=%.3e max_T=%.3e mean_T=%.3e\n",
+             1.0/All.Time - 1.0, All.Time, count_cold, count_warm, count_hot, count_sf, 
+             min_temp, max_temp, mean_temp);
+}
 
    TIMER_STOP(CPU_COOLING_SFR);
  }
