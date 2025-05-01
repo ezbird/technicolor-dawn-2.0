@@ -44,8 +44,7 @@ class coolsfr : public setcomm
   double get_starformation_rate(simparticles *Sp, int i, double *cloudMassFraction);
   void update_thermodynamic_state(simparticles *Sp, int i, double dt, double cloudMassFraction);
   void cooling_and_starformation(simparticles *Sp);
-  void debug_energy_evolution(simparticles *Sp);
-  
+
   #ifdef WINDS
     void winds_effective_model(simparticles *Sp, int i, double dt, double sfr, double cloudMassFraction);
   #endif

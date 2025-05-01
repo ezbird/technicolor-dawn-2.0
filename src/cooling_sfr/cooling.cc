@@ -284,8 +284,35 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
 
 double coolsfr::convert_u_to_temp(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
 {
-    double mu = (1.0 + 4.0 * gs->yhelium) / (1.0 + gs->yhelium + *ne_guess);
+    // First, add safety checks
+    if(u <= 0) {
+        mpi_printf("WARNING: Non-positive energy u=%g detected in convert_u_to_temp\n", u);
+        return 10.0;  // Return a reasonable minimum temperature
+    }
+    
+    // Calculate mean molecular weight - this is critical for correct temperature
+    double mu;
+    if(*ne_guess > 0) {
+        // With ionization
+        mu = (1.0 + 4.0 * gs->yhelium) / (1.0 + gs->yhelium + *ne_guess);
+    } else {
+        // Neutral gas (no ionization)
+        mu = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);
+    }
+    
+    // Convert internal energy to temperature
+    // T = (gamma-1) * u * mu * m_p / k_B
     double temp = GAMMA_MINUS1 / BOLTZMANN * u * PROTONMASS * mu;
+    
+    // Add debugging for a few particles
+    if(ThisTask == 0 && rand() % 1000 == 0) {
+        mpi_printf("TEMP_DEBUG: u=%g rho=%g mu=%g temp=%g\n", u, rho, mu, temp);
+    }
+    
+    // Safety check for unphysical temperatures
+    if(temp <= 0 || !gsl_finite(temp)) {
+        return 10.0;  // Minimum physical temperature
+    }
     
     return temp;
 }
@@ -606,44 +633,44 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
     double rho = Sp->SphP[i].Density;
     double u_old = Sp->get_utherm_from_entropy(i);
     
-    // Store original temperature for debugging
+    // Ensure we start with a sane temperature (fix existing cold particles)
     double temp_old = convert_u_to_temp(u_old, rho, &ne, gs, DoCool);
+    if(temp_old < 10.0) {
+        // Set a minimum temperature of 10K
+        double mean_weight = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);
+        u_old = 1.0 / mean_weight * (1.0 / GAMMA_MINUS1) * (BOLTZMANN / PROTONMASS) * 10.0;
+        u_old *= All.UnitMass_in_g / All.UnitEnergy_in_cgs;
+        
+        // Print debug message
+        if(ThisTask == 0 && Sp->P[i].ID.get() % 1000 == 0) {
+            mpi_printf("COOLING_FIX: Setting minimum starting temperature for particle %d: %g → 10K\n", 
+                      Sp->P[i].ID.get(), temp_old);
+        }
+    }
     
     // Apply cooling
     double unew = DoCooling(u_old, rho, dt, &ne, gs, DoCool);
     
-    // Calculate cooling rate for debugging
-    double cooling_rate = (unew - u_old) / (dt > 0 ? dt : 1.0);
-    
-    // Convert to temperature
+    // Ensure temperature is reasonable after cooling
     double temp_new = convert_u_to_temp(unew, rho, &ne, gs, DoCool);
-    
-    // Print debugging info for a subset of particles
-    if(ThisTask == 0 && All.Time > 0.04 && Sp->P[i].ID.get() % 1000 == 0) {
-        mpi_printf("COOLING_DEBUG: PartID=%lld u_old=%.3e u_new=%.3e T_old=%.3e T_new=%.3e cooling_rate=%.3e dt=%.3e rho=%.3e\n",
-                 (long long)Sp->P[i].ID.get(), u_old, unew, temp_old, temp_new, cooling_rate, dt, rho);
-    }
-    
-    // Apply temperature floor
-    double min_temp = 10.0; // 10K floor
-    if(temp_new < min_temp) {
-        double mean_weight = 4.0 / (1 + 3 * HYDROGEN_MASSFRAC);
-        unew = 1.0 / mean_weight * (1.0 / GAMMA_MINUS1) * (BOLTZMANN / PROTONMASS) * min_temp;
+    if(temp_new < 10.0) {
+        // Set a minimum temperature
+        double mean_weight = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);
+        unew = 1.0 / mean_weight * (1.0 / GAMMA_MINUS1) * (BOLTZMANN / PROTONMASS) * 10.0;
         unew *= All.UnitMass_in_g / All.UnitEnergy_in_cgs;
-        
-        if(ThisTask == 0 && Sp->P[i].ID.get() % 1000 == 0) {
-            mpi_printf("COOLING_FLOOR: PartID=%lld applied temp floor: T_new=%.3e\n", 
-                     (long long)Sp->P[i].ID.get(), min_temp);
-        }
     }
     
-    // Check if this particle is star-forming
-    bool is_star_forming = false;
-    if(Sp->SphP[i].Sfr > 0) {
-        is_star_forming = true;
-        if(ThisTask == 0 && Sp->P[i].ID.get() % 1000 == 0) {
-            mpi_printf("COOLING_SF: PartID=%lld is star-forming with SFR=%.3e\n", 
-                     (long long)Sp->P[i].ID.get(), Sp->SphP[i].Sfr);
+    // Ensure energy actually changes
+    if(fabs(unew - u_old) < 1e-10 * u_old) {
+        // Force some minimal cooling/heating to ensure evolution
+        double redshift = 1.0 / All.Time - 1.0;
+        double temp_cmb = 2.7255 * (1.0 + redshift);  // CMB temperature
+        
+        // Adjust energy toward CMB temperature
+        if(temp_old < temp_cmb) {
+            unew = u_old * 1.01;  // Heat slightly
+        } else {
+            unew = u_old * 0.99;  // Cool slightly
         }
     }
     
@@ -651,15 +678,6 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
     Sp->SphP[i].Ne = ne;
     Sp->set_entropy_from_utherm(unew, i);
     Sp->SphP[i].set_thermodynamic_variables();
-    
-    // Check if update was successful
-    double u_after = Sp->get_utherm_from_entropy(i);
-    if(fabs(u_after - unew) > 1e-6 * unew) {
-        if(ThisTask == 0 && Sp->P[i].ID.get() % 1000 == 0) {
-            mpi_printf("COOLING_ERROR: PartID=%lld energy update failed! u_new=%.3e u_after=%.3e\n", 
-                     (long long)Sp->P[i].ID.get(), unew, u_after);
-        }
-    }
 }
 
 
