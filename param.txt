@@ -116,7 +116,7 @@ CritOverDensity       57.7        % default is 57.7; overdensity threshold value
 CritPhysDensity       0          % critical physical density for star formation (in cm^(-3))
 PhysDensThresh        0.0
 CritHydrogenDensity   0.1        % only form stars where n_H > 0.1 cm^-3
-TreecoolFile        data/TREECOOL
+TreecoolFile          data/TREECOOL
 
 % ---- Wind
 WindEfficiency        2.0

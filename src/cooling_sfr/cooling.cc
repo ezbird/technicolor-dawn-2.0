@@ -627,6 +627,7 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
     
     // CRITICAL: Dampen accelerations for recently star-forming gas
     // The timestep error happens because of large accelerations after star formation
+    /*
     if(Sp->SphP[i].Sfr > 0) {
         // For star-forming particles, limit acceleration to prevent tiny timesteps
         for(int k = 0; k < 3; k++) {
@@ -639,6 +640,7 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
                 Sp->SphP[i].HydroAccel[k] = (Sp->SphP[i].HydroAccel[k] > 0) ? max_acc : -max_acc;
         }
     }
+    */
 }
 
 #endif /* COOLING */

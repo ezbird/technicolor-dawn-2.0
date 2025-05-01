@@ -344,6 +344,7 @@ integertime simparticles::get_timestep_hydro(int p /*!< particle index */)
     dt = All.DtDisplacement;
 #endif
 
+/*
   if(dt < All.MinSizeTimestep)
     {
       if(P[p].getType() == 0)
@@ -353,6 +354,26 @@ integertime simparticles::get_timestep_hydro(int p /*!< particle index */)
             All.MinSizeTimestep, (long long)P[p].ID.get(), ThisTask, dt_kin * All.cf_hubble_a, dt_courant * All.cf_hubble_a, ac);
       dt = All.MinSizeTimestep;
     }
+*/
+
+if(dt < All.MinSizeTimestep)
+{
+  if(P[p].getType() == 0)
+  {
+    // Instead of terminating, limit the timestep and warn
+    mpi_printf("WARNING: Particle %lld has requested timestep dt=%g below MinSizeTimestep=%g (ac=%g). Limiting to minimum.\n",
+              (long long)P[p].ID.get(), dt, All.MinSizeTimestep, ac);
+    
+    // Dampen acceleration to prevent future problems
+    double max_acc = 50.0;  // Maximum allowed acceleration
+    for(int k = 0; k < 3; k++)
+    {
+      if(fabs(P[p].GravAccel[k]) > max_acc)
+        P[p].GravAccel[k] = (P[p].GravAccel[k] > 0) ? max_acc : -max_acc;
+    }
+  }
+  dt = All.MinSizeTimestep;
+}
 
   integertime ti_step = (integertime)(dt / All.Timebase_interval);
 
