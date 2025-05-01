@@ -29,6 +29,11 @@ class coolsfr : public setcomm
   void InitCool(void);
   void IonizeParams(void);
 
+  void ReadIonizeParams(const char *fname);
+  void MakeCoolingTable();
+  void IonizeParams();
+  void IonizeParamsTable();
+
   void cooling_only(simparticles *Sp);
 
 #ifdef STARFORMATION
