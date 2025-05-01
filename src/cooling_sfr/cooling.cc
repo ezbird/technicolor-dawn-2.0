@@ -27,6 +27,7 @@
 #include "../pm/pm.h"
 #include "../system/system.h"
 #include "../time_integration/timestep.h"
+#include "../data/constants.h"
 
 #define RHO_TABLE_SIZE 200
 #define TEMP_TABLE_SIZE 200
