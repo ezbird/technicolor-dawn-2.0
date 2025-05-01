@@ -1,11 +1,22 @@
 #include "gadgetconfig.h"
 #ifdef COOLING
 
+#include <assert.h>
 #include <math.h>
+#include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "allvars.h"
-#include "proto.h"
+#include <string.h>
+#include <cmath>
+
+#include "../cooling_sfr/cooling.h"
+#include "../data/allvars.h"
+#include "../data/dtypes.h"
+#include "../data/mymalloc.h"
+#include "../logs/logs.h"
+#include "../logs/timer.h"
+#include "../system/system.h"
+#include "../time_integration/timestep.h"
 
 #define RHO_TABLE_SIZE 200
 #define TEMP_TABLE_SIZE 200
