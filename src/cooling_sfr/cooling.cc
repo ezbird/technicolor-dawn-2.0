@@ -54,8 +54,12 @@ static double mhboltz;
 #define TABLESIZE 500
 #define NCOOLTAB  2000
 #define XH 0.76
-#define SMALLNUM 1.0e-40
+#define COOLLIM  0.01
+#define COOL_TOL 0.002
+#define MIN_DTIONFRAC 0.01		/* minimum ionization substep size */
 
+#define NRHOTAB 240
+#define NTEMPTAB 900
 static double BetaH0[NCOOLTAB], BetaHep[NCOOLTAB], Betaff[NCOOLTAB];
 static double AlphaHp[NCOOLTAB], AlphaHep[NCOOLTAB], AlphaHepp[NCOOLTAB], Alphad[NCOOLTAB];
 static double GammaeH0[NCOOLTAB], GammaeHe0[NCOOLTAB], GammaeHep[NCOOLTAB];
