@@ -72,7 +72,7 @@ extern void IonizeParams();
 extern void MakeCoolingTable();
 extern double convert_u_to_temp(double u, double rho, double *ne_guess);
 
-void coolsfr::endrun()
+void endrun()
 {
   mpi_printf("endrun called, calling MPI_Finalize()\nbye!\n\n");
   fflush(stdout);
