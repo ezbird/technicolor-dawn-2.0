@@ -65,8 +65,7 @@
      u = T * 3.0 / 2.0 * (All.UnitDensity_in_cgs / All.UnitPressure_in_cgs) * BOLTZMANN * mu / PROTONMASS;
  
      // Estimate cooling rate
-     double du_dt = get_net_cooling_rate(u, rho, *ne_guess);  // your cooling function
- 
+     double du_dt = this->CoolingRateFromU(u, rho, ne_guess, gs, cool_data);  // the COOLING FUNCTION !!!!!
      double delta_u = du_dt * dt;
  
      if (fabs(delta_u) > max_cool_fraction * u)
