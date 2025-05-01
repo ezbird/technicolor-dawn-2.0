@@ -617,7 +617,7 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
         unew = 1.0 / mean_weight * (1.0 / GAMMA_MINUS1) * (BOLTZMANN / PROTONMASS) * min_temp;
         unew *= All.UnitMass_in_g / All.UnitEnergy_in_cgs;
     }
-    
+     
     // Update particle properties
     Sp->SphP[i].Ne = ne;
     Sp->set_entropy_from_utherm(unew, i);
