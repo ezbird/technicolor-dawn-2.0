@@ -44,8 +44,43 @@ static double GammaeH0[NCOOLTAB], GammaeHe0[NCOOLTAB], GammaeHep[NCOOLTAB];
 // Global ionization parameters
 static double J_UV = 0, gJH0 = 0, gJHep = 0, gJHe0 = 0, epsH0 = 0, epsHep = 0, epsHe0 = 0;
 
+void coolsfr::debug_energy_temp_conversion()
+{
+    // Test unit conversion with a known temperature
+    double test_temp = 1000.0;  // 1000 K
+    double mean_weight = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);  // For neutral gas
+    
+    // Convert from temperature to energy in physical units
+    double u_phys = test_temp * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mean_weight);
+    
+    // Convert to code units
+    double u_code = u_phys * All.UnitEnergy_in_cgs / All.UnitMass_in_g;
+    
+    // Now convert back to temperature
+    gas_state gs = GasState;
+    gs.yhelium = (1.0 - HYDROGEN_MASSFRAC) / (4.0 * HYDROGEN_MASSFRAC);
+    double ne = 0.0;  // Neutral gas
+    double rho = 1.0;  // Arbitrary density
+    do_cool_data DoCool{};
+    
+    double temp_back = convert_u_to_temp(u_code, rho, &ne, &gs, &DoCool);
+    
+    // Print results
+    mpi_printf("UNIT_DEBUG: Original temp=%g K\n", test_temp);
+    mpi_printf("UNIT_DEBUG: Energy in physical units=%g erg/g\n", u_phys);
+    mpi_printf("UNIT_DEBUG: Energy in code units=%g\n", u_code);
+    mpi_printf("UNIT_DEBUG: Converted back to temp=%g K\n", temp_back);
+    mpi_printf("UNIT_DEBUG: UnitMass_in_g=%g  UnitEnergy_in_cgs=%g\n", 
+              All.UnitMass_in_g, All.UnitEnergy_in_cgs);
+    mpi_printf("UNIT_DEBUG: BOLTZMANN=%g  PROTONMASS=%g  GAMMA_MINUS1=%g\n", 
+              BOLTZMANN, PROTONMASS, GAMMA_MINUS1);
+}
+
 void coolsfr::InitCool()
 {
+
+  debug_energy_temp_conversion();
+
   // Initialize physical constants
   MakeCoolingTable();
   
@@ -61,8 +96,20 @@ void coolsfr::InitCool()
   
   IonizeParams();
   
-  if(ThisTask == 0)
+  if(ThisTask == 0) {
+    // Convert a reasonable temperature to code units
+    double temp_desired = 462.0;  // 1000K is a reasonable starting point
+    double mean_weight = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);
+    double u_phys = temp_desired * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mean_weight);
+    double u_code = u_phys * All.UnitEnergy_in_cgs / All.UnitMass_in_g;
+    
+    mpi_printf("COOLING: For a temperature of %g K, the internal energy should be %g in code units\n", 
+               temp_desired, u_code);
+    mpi_printf("COOLING: Current IC value of 5.0 corresponds to roughly %g K\n", 
+               5.0 * All.UnitMass_in_g / All.UnitEnergy_in_cgs * GAMMA_MINUS1 * PROTONMASS * mean_weight / BOLTZMANN);
     mpi_printf("COOLING: Cooling tables initialized successfully.\n");
+}
+
 }
 
 void coolsfr::ReadIonizeParams(char *fname)
@@ -284,34 +331,28 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
 
 double coolsfr::convert_u_to_temp(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
 {
-    // First, add safety checks
+    // Safety check
     if(u <= 0) {
-        mpi_printf("WARNING: Non-positive energy u=%g detected in convert_u_to_temp\n", u);
-        return 10.0;  // Return a reasonable minimum temperature
+        return 10.0;  // Minimum temperature
     }
     
-    // Calculate mean molecular weight - this is critical for correct temperature
+    // Calculate mean molecular weight
     double mu;
     if(*ne_guess > 0) {
-        // With ionization
         mu = (1.0 + 4.0 * gs->yhelium) / (1.0 + gs->yhelium + *ne_guess);
     } else {
-        // Neutral gas (no ionization)
         mu = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);
     }
     
-    // Convert internal energy to temperature
-    // T = (gamma-1) * u * mu * m_p / k_B
-    double temp = GAMMA_MINUS1 / BOLTZMANN * u * PROTONMASS * mu;
+    // Convert to physical units first
+    double u_phys = u * All.UnitMass_in_g / All.UnitEnergy_in_cgs;
     
-    // Add debugging for a few particles
-    if(ThisTask == 0 && rand() % 1000 == 0) {
-        mpi_printf("TEMP_DEBUG: u=%g rho=%g mu=%g temp=%g\n", u, rho, mu, temp);
-    }
+    // Calculate temperature
+    double temp = u_phys * GAMMA_MINUS1 * PROTONMASS * mu / BOLTZMANN;
     
-    // Safety check for unphysical temperatures
-    if(temp <= 0 || !gsl_finite(temp)) {
-        return 10.0;  // Minimum physical temperature
+    // Safety check for physical temperatures
+    if(temp < 10.0 || !gsl_finite(temp)) {
+        return 10.0;
     }
     
     return temp;
