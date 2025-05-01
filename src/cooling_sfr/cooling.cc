@@ -598,26 +598,28 @@ void coolsfr::cooling_only(simparticles *Sp)
     TIMER_STOP(CPU_COOLING_SFR);
 }
 
-void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_data *DoCool) {
-    // Existing code...
-    
-    // After cooling, check temperature and apply floor
-    double rho = Sp->SphP[i].Density;
+void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_data *DoCool)
+{
+    // Get particle properties
+    double dt = (Sp->P[i].getTimeBinHydro() ? (((integertime)1) << Sp->P[i].getTimeBinHydro()) : 0) * All.Timebase_interval;
     double ne = Sp->SphP[i].Ne;
+    double rho = Sp->SphP[i].Density;
     double u_old = Sp->get_utherm_from_entropy(i);
+    
+    // Apply cooling
     double unew = DoCooling(u_old, rho, dt, &ne, gs, DoCool);
     
     // Convert to temperature
     double temp = convert_u_to_temp(unew, rho, &ne, gs, DoCool);
     
     // Apply temperature floor (adjust this value)
-    double min_temp = 50.0; // 10K floor
+    double min_temp = 50.0;
     if(temp < min_temp) {
         double mean_weight = 4.0 / (1 + 3 * HYDROGEN_MASSFRAC);
         unew = 1.0 / mean_weight * (1.0 / GAMMA_MINUS1) * (BOLTZMANN / PROTONMASS) * min_temp;
         unew *= All.UnitMass_in_g / All.UnitEnergy_in_cgs;
     }
-     
+    
     // Update particle properties
     Sp->SphP[i].Ne = ne;
     Sp->set_entropy_from_utherm(unew, i);
