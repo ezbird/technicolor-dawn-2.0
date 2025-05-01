@@ -27,8 +27,6 @@ class coolsfr : public setcomm
   double AbundanceRatios(double u, double rho, double *ne_guess, double *nH0_pointer, double *nHeII_pointer);
 
   void InitCool(void);
-  void IonizeParams(void);
-
   void ReadIonizeParams(const char *fname);
   void MakeCoolingTable();
   void IonizeParams();
