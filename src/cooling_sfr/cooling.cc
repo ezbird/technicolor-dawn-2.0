@@ -74,7 +74,7 @@ extern double convert_u_to_temp(double u, double rho, double *ne_guess);
 
 void endrun()
 {
-  mpi_printf("endrun called, calling MPI_Finalize()\nbye!\n\n");
+  printf("endrun called, calling MPI_Finalize()\nbye!\n\n");
   fflush(stdout);
 
   if(Shmem.Island_ThisTask == 0 && Shmem.Island_NTask != Shmem.World_NTask)
