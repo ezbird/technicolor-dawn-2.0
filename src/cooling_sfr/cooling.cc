@@ -44,6 +44,22 @@ void coolsfr::InitCool()
   dlogRho = (RhoMax - RhoMin) / (RHO_TABLE_SIZE - 1);
 }
 
+// TREECOOL ionization background table
+
+#define JAMPL 1.0              // scaling factor for the TREECOOL input
+#define TABLESIZE 500          // maximum number of rows in the TREECOOL file
+
+static float inlogz[TABLESIZE];         // log10(z+1)
+static float gH0[TABLESIZE];            // photoionization rate for H0
+static float gHe[TABLESIZE];            // photoionization rate for He0
+static float gHep[TABLESIZE];           // photoionization rate for He+
+static float eH0[TABLESIZE];            // photoheating rate for H0
+static float eHe[TABLESIZE];            // photoheating rate for He0
+static float eHep[TABLESIZE];           // photoheating rate for He+
+
+static int nheattab = 0;                // actual length of the table
+
+
 void coolsfr::ReadIonizeParams(const char* fname)
 {
     FILE* fdcool = std::fopen(fname, "r");
