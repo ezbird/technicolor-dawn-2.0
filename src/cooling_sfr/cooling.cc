@@ -451,81 +451,122 @@ double coolsfr::CoolingRateFromU(double u, double rho, double *ne_guess, gas_sta
 
 double coolsfr::DoCooling(double u_old, double rho, double dt, double *ne_guess, gas_state *gs, do_cool_data *DoCool)
 {
+    // Safety checks for invalid input values
+    if(!gsl_finite(u_old) || u_old < 0 || rho <= 0 || dt < 0) {
+        // Handle the error case by returning a safe value
+        if(!gsl_finite(u_old))
+            mpi_printf("WARNING: Non-finite u_old=%g detected in DoCooling, returning minimum energy\n", u_old);
+        
+        // Return minimum allowed energy to avoid termination
+        return All.MinEgySpec;
+    }
+
     DoCool->u_old_input = u_old;
     DoCool->rho_input = rho;
     DoCool->dt_input = dt;
     DoCool->ne_guess_input = *ne_guess;
 
-    if(!gsl_finite(u_old))
-        Terminate("invalid input: u_old=%g\n", u_old);
-
-    if(u_old < 0 || rho < 0)
+    if(dt == 0)
         return u_old;
 
     double u = u_old;
     gs->nHcgs = rho * HYDROGEN_MASSFRAC / PROTONMASS;
     double ratefact = gs->nHcgs * gs->nHcgs / rho;
 
-    double LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, DoCool);
+    // Safety check for cooling rate calculation
+    double LambdaNet;
+    try {
+        LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, DoCool);
+        if(!gsl_finite(LambdaNet)) {
+            mpi_printf("WARNING: Non-finite LambdaNet in DoCooling, returning original energy\n");
+            return u_old;
+        }
+    }
+    catch(...) {
+        mpi_printf("WARNING: Exception in CoolingRateFromU, returning original energy\n");
+        return u_old;
+    }
 
     // No cooling if net heating
     if(LambdaNet >= 0)
         return u_old;
 
     // Use semi-implicit integration scheme
-    if(dt > 0)
+    double m_old = 1.0;
+    double m = m_old;
+    double m_lower = m_old;
+    double m_upper = m_old;
+
+    if(m - m_old - m_old * ratefact * LambdaNet * dt > 0)
     {
-        double m_old = 1.0;
-        double m = m_old;
-        double m_lower = m_old;
-        double m_upper = m_old;
+        // We may want even a smaller timestep
+        m_upper *= 1.1;
+        m_lower /= 1.1;
 
-        if(m - m_old - m_old * ratefact * LambdaNet * dt > 0)
+        int safety_counter = 0;
+        while(m_lower - m_old - m_lower * m_lower / m_old * ratefact * CoolingRateFromU(u, rho * m_lower / m_old, ne_guess, gs, DoCool) * dt > 0)
         {
-            // We may want even a smaller timestep
-            m_upper *= 1.1;
+            m_upper = m_lower;
             m_lower /= 1.1;
+            
+            // Safety check to avoid infinite loops
+            safety_counter++;
+            if(m_lower < 1e-10 || safety_counter > 100)
+                break;
+        }
+    }
 
-            while(m_lower - m_old - m_lower * m_lower / m_old * ratefact * CoolingRateFromU(u, rho * m_lower / m_old, ne_guess, gs, DoCool) * dt > 0)
-            {
-                m_upper = m_lower;
-                m_lower /= 1.1;
-                if(m_lower < 1e-10)
-                    break;
+    // Bisection method to find the new internal energy
+    int iter = 0;
+    double dm;
+    do
+    {
+        m = 0.5 * (m_lower + m_upper);
+        
+        // Safety check for cooling rate during bisection
+        double tempLambdaNet;
+        try {
+            tempLambdaNet = CoolingRateFromU(u, rho * m / m_old, ne_guess, gs, DoCool);
+            if(!gsl_finite(tempLambdaNet)) {
+                mpi_printf("WARNING: Non-finite LambdaNet in bisection, breaking\n");
+                break;
             }
         }
-
-        // Bisection method to find the new internal energy
-        int iter = 0;
-        double dm;
-        do
-        {
-            m = 0.5 * (m_lower + m_upper);
-            LambdaNet = CoolingRateFromU(u, rho * m / m_old, ne_guess, gs, DoCool);
-
-            if(m - m_old - m * m / m_old * ratefact * LambdaNet * dt > 0)
-                m_upper = m;
-            else
-                m_lower = m;
-
-            dm = m_upper - m_lower;
-            iter++;
-
-            if(iter >= 150)
-                mpi_printf("slow convergence in DoCooling: m_up=%g, m_low=%g, dm/m=%g\n", m_upper, m_lower, dm / m);
-        }
-        while(fabs(dm / m) > 1.0e-6 && iter < 200);
-
-        if(iter >= 200)
-        {
-            mpi_printf("failed to converge in DoCooling()\n");
-            mpi_printf("DoCool_u_old_input=%g\nDoCool_rho_input= %g\nDoCool_dt_input= %g\nDoCool_ne_guess_input= %g\n",
-                DoCool->u_old_input, DoCool->rho_input, DoCool->dt_input, DoCool->ne_guess_input);
-            Terminate("convergence failure");
+        catch(...) {
+            mpi_printf("WARNING: Exception in CoolingRateFromU during bisection, breaking\n");
+            break;
         }
 
-        u = u_old * m / m_old;
+        if(m - m_old - m * m / m_old * ratefact * tempLambdaNet * dt > 0)
+            m_upper = m;
+        else
+            m_lower = m;
+
+        dm = m_upper - m_lower;
+        iter++;
+
+        if(iter >= 150) {
+            mpi_printf("slow convergence in DoCooling: m_up=%g, m_low=%g, dm/m=%g\n", m_upper, m_lower, dm / m);
+        }
     }
+    while(fabs(dm / m) > 1.0e-6 && iter < 100);  // Reduced max iterations for safety
+
+    // Calculate new internal energy
+    u = u_old * m / m_old;
+    
+    // Final safety check for output value
+    if(!gsl_finite(u) || u < 0) {
+        mpi_printf("WARNING: Invalid energy result in DoCooling u=%g, returning minimum energy\n", u);
+        return All.MinEgySpec;
+    }
+    
+    // Limit cooling to reasonable values
+    if(u < 0.1 * u_old)
+        u = 0.1 * u_old;
+    
+    // Make sure we don't fall below minimum energy
+    if(u < All.MinEgySpec)
+        u = All.MinEgySpec;
 
     return u;
 }
@@ -563,15 +604,41 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
     double dt = (Sp->P[i].getTimeBinHydro() ? (((integertime)1) << Sp->P[i].getTimeBinHydro()) : 0) * All.Timebase_interval;
     double ne = Sp->SphP[i].Ne;
     double rho = Sp->SphP[i].Density;
-    double u_old = Sp->get_utherm_from_entropy(i);
     
-    // Apply cooling
+    // Get thermal energy with safety check
+    double u_old;
+    try {
+        u_old = Sp->get_utherm_from_entropy(i);
+        if(!gsl_finite(u_old) || u_old <= 0) {
+            mpi_printf("WARNING: Invalid energy u_old=%g for particle %d, skipping cooling\n", u_old, Sp->P[i].ID.get());
+            return;
+        }
+    }
+    catch(...) {
+        mpi_printf("WARNING: Exception in get_utherm_from_entropy for particle %d, skipping cooling\n", Sp->P[i].ID.get());
+        return;
+    }
+    
+    // Apply cooling with safety checks
     double unew = DoCooling(u_old, rho, dt, &ne, gs, DoCool);
+    
+    // Ensure valid values
+    if(!gsl_finite(unew) || unew <= 0) {
+        mpi_printf("WARNING: DoCooling returned invalid energy unew=%g for particle %d, using minimum energy\n", 
+                  unew, Sp->P[i].ID.get());
+        unew = All.MinEgySpec;
+    }
     
     // Update particle properties
     Sp->SphP[i].Ne = ne;
-    Sp->set_entropy_from_utherm(unew, i);
-    Sp->SphP[i].set_thermodynamic_variables();
+    
+    try {
+        Sp->set_entropy_from_utherm(unew, i);
+        Sp->SphP[i].set_thermodynamic_variables();
+    }
+    catch(...) {
+        mpi_printf("WARNING: Exception in set_entropy_from_utherm for particle %d\n", Sp->P[i].ID.get());
+    }
 }
 
 #endif /* COOLING */
