@@ -44,12 +44,6 @@ void coolsfr::InitCool()
   dlogRho = (RhoMax - RhoMin) / (RHO_TABLE_SIZE - 1);
 }
 
-#include <cstdio>
-#include <cmath>
-#include <cstring>
-#include "allvars.h"
-#include "proto.h"
-
 void coolsfr::ReadIonizeParams(const char* fname)
 {
     FILE* fdcool = std::fopen(fname, "r");
