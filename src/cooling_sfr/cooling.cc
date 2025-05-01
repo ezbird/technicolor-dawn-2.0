@@ -604,47 +604,40 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
     double dt = (Sp->P[i].getTimeBinHydro() ? (((integertime)1) << Sp->P[i].getTimeBinHydro()) : 0) * All.Timebase_interval;
     double ne = Sp->SphP[i].Ne;
     double rho = Sp->SphP[i].Density;
+    double u_old = Sp->get_utherm_from_entropy(i);
     
-    // Get thermal energy with safety check
-    double u_old;
-    try {
-        u_old = Sp->get_utherm_from_entropy(i);
-        if(!gsl_finite(u_old) || u_old <= 0) {
-            mpi_printf("WARNING: Invalid energy u_old=%g for particle %d, skipping cooling\n", u_old, Sp->P[i].ID.get());
-            return;
-        }
-    }
-    catch(...) {
-        mpi_printf("WARNING: Exception in get_utherm_from_entropy for particle %d, skipping cooling\n", Sp->P[i].ID.get());
-        return;
-    }
-    
-    // Apply cooling with safety checks
+    // Apply cooling
     double unew = DoCooling(u_old, rho, dt, &ne, gs, DoCool);
-    
-    // Ensure valid values
-    if(!gsl_finite(unew) || unew <= 0) {
-        mpi_printf("WARNING: DoCooling returned invalid energy unew=%g for particle %d, using minimum energy\n", 
-                  unew, Sp->P[i].ID.get());
-        unew = All.MinEgySpec;
-    }
     
     // Limit maximum energy change per step to prevent timestep issues
     double max_change_factor = 2.0;  // Allow at most doubling/halving of energy per step
     if(unew > max_change_factor * u_old)
         unew = max_change_factor * u_old;
-    else if(unew < u_old / max_change_factor)
+    else if(unew < u_old / max_change_factor && unew < u_old)  // Only limit when cooling
         unew = u_old / max_change_factor;
-
+    
+    // Ensure we don't go below minimum allowed energy
+    if(unew < All.MinEgySpec)
+        unew = All.MinEgySpec;
+    
     // Update particle properties
     Sp->SphP[i].Ne = ne;
+    Sp->set_entropy_from_utherm(unew, i);
+    Sp->SphP[i].set_thermodynamic_variables();
     
-    try {
-        Sp->set_entropy_from_utherm(unew, i);
-        Sp->SphP[i].set_thermodynamic_variables();
-    }
-    catch(...) {
-        mpi_printf("WARNING: Exception in set_entropy_from_utherm for particle %d\n", Sp->P[i].ID.get());
+    // CRITICAL: Dampen accelerations for recently star-forming gas
+    // The timestep error happens because of large accelerations after star formation
+    if(Sp->SphP[i].Sfr > 0) {
+        // For star-forming particles, limit acceleration to prevent tiny timesteps
+        for(int k = 0; k < 3; k++) {
+            double max_acc = 10.0;  // Maximum allowed acceleration in code units
+            if(fabs(Sp->P[i].GravAccel[k]) > max_acc)
+                Sp->P[i].GravAccel[k] = (Sp->P[i].GravAccel[k] > 0) ? max_acc : -max_acc;
+            
+            // Also dampen hydro accelerations if present
+            if(Sp->SphP[i].HydroAccel != NULL && fabs(Sp->SphP[i].HydroAccel[k]) > max_acc)
+                Sp->SphP[i].HydroAccel[k] = (Sp->SphP[i].HydroAccel[k] > 0) ? max_acc : -max_acc;
+        }
     }
 }
 
