@@ -44,7 +44,12 @@ static double mhboltz;
 
 #define JAMPL 1.0
 #define TABLESIZE 500
+#define NCOOLTAB  2000
+#define XH 0.76
 
+static double BetaH0[NCOOLTAB], BetaHep[NCOOLTAB], Betaff[NCOOLTAB];
+static double AlphaHp[NCOOLTAB], AlphaHep[NCOOLTAB], AlphaHepp[NCOOLTAB], Alphad[NCOOLTAB];
+static double GammaeH0[NCOOLTAB], GammaeHe0[NCOOLTAB], GammaeHep[NCOOLTAB];
 
 extern void ReadIonizeParams(const char *fname);
 extern void IonizeParams();
