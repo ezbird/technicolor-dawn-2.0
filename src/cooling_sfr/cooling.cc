@@ -606,24 +606,60 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
     double rho = Sp->SphP[i].Density;
     double u_old = Sp->get_utherm_from_entropy(i);
     
+    // Store original temperature for debugging
+    double temp_old = convert_u_to_temp(u_old, rho, &ne, gs, DoCool);
+    
     // Apply cooling
     double unew = DoCooling(u_old, rho, dt, &ne, gs, DoCool);
     
-    // Convert to temperature
-    double temp = convert_u_to_temp(unew, rho, &ne, gs, DoCool);
+    // Calculate cooling rate for debugging
+    double cooling_rate = (unew - u_old) / (dt > 0 ? dt : 1.0);
     
-    // Apply temperature floor (adjust this value)
-    double min_temp = 50.0;
-    if(temp < min_temp) {
+    // Convert to temperature
+    double temp_new = convert_u_to_temp(unew, rho, &ne, gs, DoCool);
+    
+    // Print debugging info for a subset of particles
+    if(ThisTask == 0 && All.Time > 0.04 && Sp->P[i].ID.get() % 1000 == 0) {
+        mpi_printf("COOLING_DEBUG: PartID=%lld u_old=%.3e u_new=%.3e T_old=%.3e T_new=%.3e cooling_rate=%.3e dt=%.3e rho=%.3e\n",
+                 (long long)Sp->P[i].ID.get(), u_old, unew, temp_old, temp_new, cooling_rate, dt, rho);
+    }
+    
+    // Apply temperature floor
+    double min_temp = 10.0; // 10K floor
+    if(temp_new < min_temp) {
         double mean_weight = 4.0 / (1 + 3 * HYDROGEN_MASSFRAC);
         unew = 1.0 / mean_weight * (1.0 / GAMMA_MINUS1) * (BOLTZMANN / PROTONMASS) * min_temp;
         unew *= All.UnitMass_in_g / All.UnitEnergy_in_cgs;
+        
+        if(ThisTask == 0 && Sp->P[i].ID.get() % 1000 == 0) {
+            mpi_printf("COOLING_FLOOR: PartID=%lld applied temp floor: T_new=%.3e\n", 
+                     (long long)Sp->P[i].ID.get(), min_temp);
+        }
+    }
+    
+    // Check if this particle is star-forming
+    bool is_star_forming = false;
+    if(Sp->SphP[i].Sfr > 0) {
+        is_star_forming = true;
+        if(ThisTask == 0 && Sp->P[i].ID.get() % 1000 == 0) {
+            mpi_printf("COOLING_SF: PartID=%lld is star-forming with SFR=%.3e\n", 
+                     (long long)Sp->P[i].ID.get(), Sp->SphP[i].Sfr);
+        }
     }
     
     // Update particle properties
     Sp->SphP[i].Ne = ne;
     Sp->set_entropy_from_utherm(unew, i);
     Sp->SphP[i].set_thermodynamic_variables();
+    
+    // Check if update was successful
+    double u_after = Sp->get_utherm_from_entropy(i);
+    if(fabs(u_after - unew) > 1e-6 * unew) {
+        if(ThisTask == 0 && Sp->P[i].ID.get() % 1000 == 0) {
+            mpi_printf("COOLING_ERROR: PartID=%lld energy update failed! u_new=%.3e u_after=%.3e\n", 
+                     (long long)Sp->P[i].ID.get(), unew, u_after);
+        }
+    }
 }
 
 #endif /* COOLING */

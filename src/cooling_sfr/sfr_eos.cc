@@ -151,6 +151,8 @@
          }
      } /* end of main loop over active particles */
  
+     debug_energy_evolution(Sp);
+
    TIMER_STOP(CPU_COOLING_SFR); // Stop timing the function
  }
  

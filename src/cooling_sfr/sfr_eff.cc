@@ -574,6 +574,7 @@
                  }
              }
          }
+
      }
    
    // Collect star formation statistics
@@ -636,8 +637,10 @@
     SF_PRINT("STARFORMATION: %d total PartType4 stars exist at z=%.3f\n", 
           total_star_count, 1.0 / All.Time - 1.0);
 
+   // Debugging summary of the temperature distribution of your gas particles at each step when cooling is applied
+   debug_energy_evolution(Sp);
+
    TIMER_STOP(CPU_COOLING_SFR);
- 
  }
  
  /* FROM A NEWER GADGET-4 SF Ezra worked in */
