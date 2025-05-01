@@ -147,9 +147,6 @@ void coolsfr::MakeCoolingTable()
     }
 }
 
-#include <cmath>
-#include "allvars.h"
-#include "proto.h"
 
 void coolsfr::IonizeParams()
 {
