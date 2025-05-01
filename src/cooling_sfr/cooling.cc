@@ -19,6 +19,9 @@
 #include "../time_integration/timestep.h"
 #include "../data/constants.h"
 
+// Define missing constant
+#define VERY_LARGE_NUMBER 1.0e30
+
 // TREECOOL table variables
 #define JAMPL 1.0
 #define TABLESIZE 500
@@ -40,7 +43,6 @@ static double GammaeH0[NCOOLTAB], GammaeHe0[NCOOLTAB], GammaeHep[NCOOLTAB];
 
 // Global ionization parameters
 static double J_UV = 0, gJH0 = 0, gJHep = 0, gJHe0 = 0, epsH0 = 0, epsHep = 0, epsHe0 = 0;
-static double redshift_old = -100., gJH0_old = -100.;
 
 void coolsfr::InitCool()
 {
@@ -130,8 +132,9 @@ void coolsfr::MakeCoolingTable()
 
     this->deltaT = (Tmax - Tmin) / N;
 
-    // Calculate minimum entropy
-    this->ethmin = pow(10.0, Tmin) * (1.0 + yhelium) / ((1.0 + 4.0 * yhelium) * mhboltz * GAMMA_MINUS1);
+    // Note: Using All.MinGasTemp instead of ethmin
+    // The ethmin variable is not used elsewhere in this implementation
+    double min_temp = pow(10.0, Tmin) * (1.0 + yhelium) / ((1.0 + 4.0 * yhelium) * mhboltz * GAMMA_MINUS1);
 
     for (int i = 0; i <= N; ++i)
     {
@@ -272,7 +275,7 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
     double LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, DoCool);
 
     if(LambdaNet >= 0)
-        return VERY_LARGE_NUMBER;
+        return 1.0e30;  // Very large number instead of VERY_LARGE_NUMBER
 
     double coolingtime = u_old / (-ratefact * LambdaNet);
 
@@ -472,7 +475,6 @@ double coolsfr::DoCooling(double u_old, double rho, double dt, double *ne_guess,
     // Use semi-implicit integration scheme
     if(dt > 0)
     {
-        double dtcool = dt;
         double m_old = 1.0;
         double m = m_old;
         double m_lower = m_old;
