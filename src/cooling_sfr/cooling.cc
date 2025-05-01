@@ -598,49 +598,30 @@ void coolsfr::cooling_only(simparticles *Sp)
     TIMER_STOP(CPU_COOLING_SFR);
 }
 
-void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_data *DoCool)
-{
-    // Get particle properties
-    double dt = (Sp->P[i].getTimeBinHydro() ? (((integertime)1) << Sp->P[i].getTimeBinHydro()) : 0) * All.Timebase_interval;
-    double ne = Sp->SphP[i].Ne;
-    double rho = Sp->SphP[i].Density;
-    double u_old = Sp->get_utherm_from_entropy(i);
+void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_data *DoCool) {
+    // Existing code...
     
-    // Apply cooling
+    // After cooling, check temperature and apply floor
+    double rho = Sp->SphP[i].Density;
+    double ne = Sp->SphP[i].Ne;
+    double u_old = Sp->get_utherm_from_entropy(i);
     double unew = DoCooling(u_old, rho, dt, &ne, gs, DoCool);
     
-    // Limit maximum energy change per step to prevent timestep issues
-    double max_change_factor = 2.0;  // Allow at most doubling/halving of energy per step
-    if(unew > max_change_factor * u_old)
-        unew = max_change_factor * u_old;
-    else if(unew < u_old / max_change_factor && unew < u_old)  // Only limit when cooling
-        unew = u_old / max_change_factor;
+    // Convert to temperature
+    double temp = convert_u_to_temp(unew, rho, &ne, gs, DoCool);
     
-    // Ensure we don't go below minimum allowed energy
-    if(unew < All.MinEgySpec)
-        unew = All.MinEgySpec;
+    // Apply temperature floor (adjust this value)
+    double min_temp = 50.0; // 10K floor
+    if(temp < min_temp) {
+        double mean_weight = 4.0 / (1 + 3 * HYDROGEN_MASSFRAC);
+        unew = 1.0 / mean_weight * (1.0 / GAMMA_MINUS1) * (BOLTZMANN / PROTONMASS) * min_temp;
+        unew *= All.UnitMass_in_g / All.UnitEnergy_in_cgs;
+    }
     
     // Update particle properties
     Sp->SphP[i].Ne = ne;
     Sp->set_entropy_from_utherm(unew, i);
     Sp->SphP[i].set_thermodynamic_variables();
-    
-    // CRITICAL: Dampen accelerations for recently star-forming gas
-    // The timestep error happens because of large accelerations after star formation
-    /*
-    if(Sp->SphP[i].Sfr > 0) {
-        // For star-forming particles, limit acceleration to prevent tiny timesteps
-        for(int k = 0; k < 3; k++) {
-            double max_acc = 10.0;  // Maximum allowed acceleration in code units
-            if(fabs(Sp->P[i].GravAccel[k]) > max_acc)
-                Sp->P[i].GravAccel[k] = (Sp->P[i].GravAccel[k] > 0) ? max_acc : -max_acc;
-            
-            // Also dampen hydro accelerations if present
-            if(Sp->SphP[i].HydroAccel != NULL && fabs(Sp->SphP[i].HydroAccel[k]) > max_acc)
-                Sp->SphP[i].HydroAccel[k] = (Sp->SphP[i].HydroAccel[k] > 0) ? max_acc : -max_acc;
-        }
-    }
-    */
 }
 
 #endif /* COOLING */

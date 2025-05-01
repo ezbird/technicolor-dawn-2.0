@@ -97,7 +97,7 @@ MinimumComovingHydroSoftening 0.001
 
 %----- SPH
 ArtBulkViscConst             1.0
-MinEgySpec                   1          ; in code units, 5  ~350K, Prevents gas from cooling below this specific internal energy floor (units are energy per unit mass).
+MinEgySpec                   0          ; in code units, 5  ~350K, Prevents gas from cooling below this specific internal energy floor (units are energy per unit mass).
 #MinEgySpec                   2.60e-16   ; Corresponds to ~300K floor
 MinGasTemp                   50
 InitGasTemp                  462.77046  ; in Kelvin, Sets the initial gas temperature, if not provided in the ICs.
