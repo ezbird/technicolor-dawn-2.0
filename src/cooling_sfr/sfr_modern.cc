@@ -1,6 +1,8 @@
 // src/cooling_sph/sfr_modern.cpp
 // Implements the star formation routines as methods of coolsfr
 
+#include "gadgetconfig.h"
+
 #include <math.h>
 #include <mpi.h>
 #include <stdio.h>
