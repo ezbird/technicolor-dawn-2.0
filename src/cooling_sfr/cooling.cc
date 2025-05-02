@@ -683,45 +683,28 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
     double rho = Sp->SphP[i].Density;
     double u_old = Sp->get_utherm_from_entropy(i);
     
-    // Ensure we start with a sane temperature (fix existing cold particles)
+    // Calculate temperature before cooling
     double temp_old = convert_u_to_temp(u_old, rho, &ne, gs, DoCool);
-    if(temp_old < 10.0) {
-        // Set a minimum temperature of 10K
-        double mean_weight = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);
-        u_old = 1.0 / mean_weight * (1.0 / GAMMA_MINUS1) * (BOLTZMANN / PROTONMASS) * 10.0;
-        u_old *= All.UnitMass_in_g / All.UnitEnergy_in_cgs;
-        
-        // Print debug message
-        if(ThisTask == 0 && Sp->P[i].ID.get() % 1000 == 0) {
-            mpi_printf("COOLING_FIX: Setting minimum starting temperature for particle %d: %g → 10K\n", 
-                      Sp->P[i].ID.get(), temp_old);
-        }
-    }
     
     // Apply cooling
     double unew = DoCooling(u_old, rho, dt, &ne, gs, DoCool);
     
-    // Ensure temperature is reasonable after cooling
-    double temp_new = convert_u_to_temp(unew, rho, &ne, gs, DoCool);
-    if(temp_new < 10.0) {
-        // Set a minimum temperature
-        double mean_weight = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);
-        unew = 1.0 / mean_weight * (1.0 / GAMMA_MINUS1) * (BOLTZMANN / PROTONMASS) * 10.0;
-        unew *= All.UnitMass_in_g / All.UnitEnergy_in_cgs;
+    // Temperature after cooling
+    double temp_after_cooling = convert_u_to_temp(unew, rho, &ne, gs, DoCool);
+    
+    // Check if cooling is overpowering adiabatic heating
+    if(ThisTask == 0 && i % 1000 == 0) {
+        mpi_printf("COOLING_BALANCE: Part %d rho=%g T_old=%g T_cooled=%g cooling_change=%g%%\n",
+                  Sp->P[i].ID.get(), rho, temp_old, temp_after_cooling, 
+                  100.0 * (temp_after_cooling - temp_old) / temp_old);
     }
     
-    // Ensure energy actually changes
-    if(fabs(unew - u_old) < 1e-10 * u_old) {
-        // Force some minimal cooling/heating to ensure evolution
-        double redshift = 1.0 / All.Time - 1.0;
-        double temp_cmb = 2.7255 * (1.0 + redshift);  // CMB temperature
-        
-        // Adjust energy toward CMB temperature
-        if(temp_old < temp_cmb) {
-            unew = u_old * 1.01;  // Heat slightly
-        } else {
-            unew = u_old * 0.99;  // Cool slightly
-        }
+    // Apply temperature floor directly
+    double temp_min = 462.0; // Your desired minimum temperature
+    if(temp_after_cooling < temp_min) {
+        double mean_weight = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);
+        unew = BOLTZMANN * temp_min / (mean_weight * PROTONMASS * GAMMA_MINUS1);
+        unew /= (All.UnitVelocity_in_cm_per_s * All.UnitVelocity_in_cm_per_s);
     }
     
     // Update particle properties
