@@ -604,8 +604,8 @@ void sph::density(int *list, int ntarget)
                         if(SphP[target].Hsml <= 0)
                         {
                             // Fix negative smoothing length instead of terminating
-                            printf("WARNING: Fixing negative smoothing length for particle ID=%lld (Hsml=%g)\n", 
-                                       (long long)SphP[target].ID.get(), SphP[target].Hsml);
+                            printf("WARNING: Fixing negative smoothing length: (Hsml=%g)\n", 
+                                       SphP[target].Hsml);
                             
                             // Set to a small positive value
                             SphP[target].Hsml = All.SofteningTable[0]; // Use gravitational softening as fallback
