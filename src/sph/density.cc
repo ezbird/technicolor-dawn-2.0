@@ -605,8 +605,8 @@ void sph::density(int *list, int ntarget)
                             if(SphP[i].Hsml <= 0 || SphP[i].Hsml > 10.0 * All.SofteningTable[0])  // Check for negative or extremely large values
                             {
                                 // Fix problematic smoothing length instead of terminating
-                                mpi_printf("WARNING: Fixing problematic smoothing length for particle ID=%llu (Hsml=%g)\n", 
-                                          (unsigned long long)P[i].ID.get(), SphP[i].Hsml);
+                                printf("WARNING: Fixing problematic smoothing length (Hsml=%g)\n", 
+                                          SphP[i].Hsml);
                                 
                                 // Set to a reasonable value based on softening
                                 double reasonable_hsml = All.SofteningTable[0] * 2.0; // 2x the softening length
