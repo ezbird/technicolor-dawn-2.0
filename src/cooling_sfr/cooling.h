@@ -128,9 +128,9 @@
    void ReadIonizeParams(char *fname);
  
    /* Default G4 analytic table builder (guarded out by TABLECOOL) */
- #ifndef TABLECOOL
-   void MakeRateTable(void);
- #endif
+ //#ifndef TABLECOOL
+ //  void MakeRateTable(void);
+ //#endif
  };
  
  #endif /* COOLING */
