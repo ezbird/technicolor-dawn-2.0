@@ -36,9 +36,7 @@
 void coolsfr::InitCoolMemory()
 {
     // Allocate one contiguous array of rate_table structs
-    RateT = (rate_table *) 
-              mymalloc(RateT,
-                       (size_t)(NCOOLTAB + 1) * sizeof(rate_table));
+    RateT = (rate_table *)Mem.mymalloc("RateT", (NCOOLTAB + 1) * sizeof(rate_table));
 }
 
 /** \brief Compute the new internal energy per unit mass.
