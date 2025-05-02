@@ -700,7 +700,7 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
     }
     
     // Apply temperature floor directly
-    double temp_min = 462.0; // Your desired minimum temperature
+    double temp_min = 50.0; // Your desired minimum temperature
     if(temp_after_cooling < temp_min) {
         double mean_weight = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);
         unew = BOLTZMANN * temp_min / (mean_weight * PROTONMASS * GAMMA_MINUS1);
