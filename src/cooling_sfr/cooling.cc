@@ -677,6 +677,13 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
     // Apply cooling
     double unew = DoCooling(u_old, rho, dt, &ne, gs, DoCool);
     
+    // Limit maximum energy change per timestep to improve stability
+    double max_change_factor = 1.2; // Allow at most 20% change per step
+    if(unew > max_change_factor * u_old)
+        unew = max_change_factor * u_old;
+    else if(unew < u_old / max_change_factor)
+        unew = u_old / max_change_factor;
+    
     // Get temperature after cooling
     double temp_new = convert_u_to_temp(unew, rho, &ne, gs, DoCool);
     
