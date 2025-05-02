@@ -1,13 +1,25 @@
+/*******************************************************************************
+ * \copyright   This file is part of the GADGET4 N-body/SPH code developed
+ * \copyright   by Volker Springel. Copyright (C) 2014-2020 by Volker Springel
+ * \copyright   (vspringel@mpa-garching.mpg.de) and all contributing authors.
+ *******************************************************************************/
+
+/*! \file cooling.cc
+ *
+ *  \brief Module for gas radiative cooling
+ */
+
 #include "gadgetconfig.h"
+
 #ifdef COOLING
 
-#include <assert.h>
+#include <gsl/gsl_math.h>
 #include <math.h>
 #include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <cmath>
+#include <algorithm>
 
 #include "../cooling_sfr/cooling.h"
 #include "../data/allvars.h"
@@ -17,701 +29,721 @@
 #include "../logs/timer.h"
 #include "../system/system.h"
 #include "../time_integration/timestep.h"
-#include "../data/constants.h"
 
-// Define missing constant
-#define VERY_LARGE_NUMBER 1.0e30
-
-// TREECOOL table variables
-#define JAMPL 1.0
-#define TABLESIZE 500
-#define NCOOLTAB 2000
-
-static float inlogz[TABLESIZE];   // log10(z+1)
-static float gH0[TABLESIZE];      // photoionization rate for H0
-static float gHe[TABLESIZE];      // photoionization rate for He0
-static float gHep[TABLESIZE];     // photoionization rate for He+
-static float eH0[TABLESIZE];      // photoheating rate for H0
-static float eHe[TABLESIZE];      // photoheating rate for He0
-static float eHep[TABLESIZE];     // photoheating rate for He+
-static int nheattab = 0;          // actual length of the table
-
-// Cooling rate tables
-static double BetaH0[NCOOLTAB], BetaHep[NCOOLTAB], Betaff[NCOOLTAB];
-static double AlphaHp[NCOOLTAB], AlphaHep[NCOOLTAB], AlphaHepp[NCOOLTAB], Alphad[NCOOLTAB];
-static double GammaeH0[NCOOLTAB], GammaeHe0[NCOOLTAB], GammaeHep[NCOOLTAB];
-
-// Global ionization parameters
-static double J_UV = 0, gJH0 = 0, gJHep = 0, gJHe0 = 0, epsH0 = 0, epsHep = 0, epsHe0 = 0;
-
-void coolsfr::debug_energy_temp_conversion()
+// ----------------------------------------------------------------------
+// Allocate the rate table for NCOOLTAB+1 entries
+// ----------------------------------------------------------------------
+void coolsfr::InitCoolMemory()
 {
-    // Test unit conversion with a known temperature
-    double test_temp = 1000.0;  // 1000 K
-    double mean_weight = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);  // For neutral gas
-    
-    // Convert from temperature to energy in physical units
-    double u_phys = test_temp * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mean_weight);
-    
-    // Convert to code units
-    double u_code = u_phys * All.UnitEnergy_in_cgs / All.UnitMass_in_g;
-    
-    // Now convert back to temperature
-    gas_state gs = GasState;
-    gs.yhelium = (1.0 - HYDROGEN_MASSFRAC) / (4.0 * HYDROGEN_MASSFRAC);
-    double ne = 0.0;  // Neutral gas
-    double rho = 1.0;  // Arbitrary density
-    do_cool_data DoCool{};
-    
-    double temp_back = convert_u_to_temp(u_code, rho, &ne, &gs, &DoCool);
-    
-    // Print results
-    mpi_printf("UNIT_DEBUG: Original temp=%g K\n", test_temp);
-    mpi_printf("UNIT_DEBUG: Energy in physical units=%g erg/g\n", u_phys);
-    mpi_printf("UNIT_DEBUG: Energy in code units=%g\n", u_code);
-    mpi_printf("UNIT_DEBUG: Converted back to temp=%g K\n", temp_back);
-    mpi_printf("UNIT_DEBUG: UnitMass_in_g=%g  UnitEnergy_in_cgs=%g\n", 
-              All.UnitMass_in_g, All.UnitEnergy_in_cgs);
-    mpi_printf("UNIT_DEBUG: BOLTZMANN=%g  PROTONMASS=%g  GAMMA_MINUS1=%g\n", 
-              BOLTZMANN, PROTONMASS, GAMMA_MINUS1);
+    // RateT is declared in cooling.h as `rate_table *RateT;`
+    RateT = (rate_table *) mymalloc((size_t)(NCOOLTAB + 1) * sizeof(rate_table));
 }
 
-void coolsfr::InitCool()
-{
-
-  debug_energy_temp_conversion();
-
-  // Initialize physical constants
-  MakeCoolingTable();
-  
-  // Read in ionization parameters from TREECOOL file
-  if(ThisTask == 0)
-    mpi_printf("COOLING: Reading ionization table from file '%s'\n", All.TreecoolFile);
-  
-  ReadIonizeParams(All.TreecoolFile);
-  
-  // Set up ionization parameters based on current time
-  All.Time = All.TimeBegin;
-  All.set_cosmo_factors_for_current_time();
-  
-  IonizeParams();
-  
-  if(ThisTask == 0) {
-    // Calculate energy for 462K temperature correctly
-    double temp_desired = 462.0;  // Desired temperature
-    double mean_weight = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);
-    
-    // Calculate physical specific energy (erg/g)
-    double u_phys = BOLTZMANN * temp_desired / (mean_weight * PROTONMASS * GAMMA_MINUS1);
-    
-    // Convert to code units
-    double u_code = u_phys / (All.UnitVelocity_in_cm_per_s * All.UnitVelocity_in_cm_per_s);
-    
-    // Print the correctly calculated values
-    mpi_printf("COOLING: For a temperature of %g K, the internal energy should be %g in code units\n", 
-               temp_desired, u_code);
-    
-    // Calculate what the current IC value corresponds to
-    double current_temp = 5.0 * (All.UnitVelocity_in_cm_per_s * All.UnitVelocity_in_cm_per_s) 
-                         * mean_weight * PROTONMASS * GAMMA_MINUS1 / BOLTZMANN;
-    
-    mpi_printf("COOLING: Current IC value of 5.0 corresponds to roughly %g K\n", current_temp);
-    mpi_printf("COOLING: Cooling tables initialized successfully.\n");
-}
-
-}
-
-void coolsfr::ReadIonizeParams(char *fname)
-{
-    FILE* fdcool = fopen(fname, "r");
-
-    if (!fdcool)
-    {
-        mpi_printf("COOLING: Cannot read ionization table in file '%s'\n", fname);
-        Terminate("Failed to open TREECOOL file\n");
-    }
-
-    for (int i = 0; i < TABLESIZE; ++i)
-        gH0[i] = 0.0;
-
-    for (int i = 0; i < TABLESIZE; ++i)
-    {
-        int ret = fscanf(fdcool, "%g %g %g %g %g %g %g",
-                          &inlogz[i], &gH0[i], &gHe[i], &gHep[i],
-                          &eH0[i], &eHe[i], &eHep[i]);
-
-        if (ret == EOF)
-            break;
-    }
-
-    fclose(fdcool);
-
-    // Count valid entries in table
-    nheattab = 0;
-    for (int i = 0; i < TABLESIZE; ++i)
-    {
-        if (gH0[i] != 0.0)
-            ++nheattab;
-        else
-            break;
-    }
-
-    if (ThisTask == 0)
-        mpi_printf("COOLING: Read ionization table with %d entries in file '%s'.\n", nheattab, fname);
-
-    // Ignore zeros at end of treecool file
-    for(int i = 0; i < nheattab; ++i) {
-        if(gH0[i] == 0.0) {
-            nheattab = i;
-            break;
-        }
-    }
-
-    if(nheattab < 1)
-        Terminate("The length of the cooling table has to have at least one entry");
-}
-
-void coolsfr::MakeCoolingTable()
-{
-    const int N = NCOOLTAB;
-    double T, Tfact;
-
-    double yhelium = (1.0 - HYDROGEN_MASSFRAC) / (4.0 * HYDROGEN_MASSFRAC);
-    double mhboltz = PROTONMASS / BOLTZMANN;
-
-    // Set up the temperature range
-    double Tmin = 1.0;
-    double Tmax = 9.0;
-
-    if (All.MinGasTemp > 0.0)
-        Tmin = log10(All.MinGasTemp);
-
-    this->deltaT = (Tmax - Tmin) / N;
-
-    // Note: Using All.MinGasTemp instead of ethmin
-    // The ethmin variable is not used elsewhere in this implementation
-    double min_temp = pow(10.0, Tmin) * (1.0 + yhelium) / ((1.0 + 4.0 * yhelium) * mhboltz * GAMMA_MINUS1);
-
-    for (int i = 0; i <= N; ++i)
-    {
-        BetaH0[i] = BetaHep[i] = Betaff[i] = 0;
-        AlphaHp[i] = AlphaHep[i] = AlphaHepp[i] = Alphad[i] = 0;
-        GammaeH0[i] = GammaeHe0[i] = GammaeHep[i] = 0;
-
-        T = pow(10.0, Tmin + this->deltaT * i);
-        Tfact = 1.0 / (1.0 + sqrt(T / 1.0e5));
-
-        if (118348.0 / T < 70.0)
-            BetaH0[i] = 7.5e-19 * exp(-118348.0 / T) * Tfact;
-
-        if (473638.0 / T < 70.0)
-            BetaHep[i] = 5.54e-17 * pow(T, -0.397) * exp(-473638.0 / T) * Tfact;
-
-        Betaff[i] = 1.43e-27 * sqrt(T) * (1.1 + 0.34 * exp(-pow((5.5 - log10(T)), 2) / 3.0));
-
-        AlphaHp[i] = 8.4e-11 * pow(T / 1000.0, -0.2) / (1.0 + pow(T / 1.0e6, 0.7)) / sqrt(T);
-        AlphaHep[i] = 1.5e-10 * pow(T, -0.6353);
-        AlphaHepp[i] = 4.0 * AlphaHp[i];
-
-        if (470000.0 / T < 70.0)
-            Alphad[i] = 1.9e-3 * pow(T, -1.5) * exp(-470000.0 / T) *
-                        (1.0 + 0.3 * exp(-94000.0 / T));
-
-        if (157809.1 / T < 70.0)
-            GammaeH0[i] = 5.85e-11 * sqrt(T) * exp(-157809.1 / T) * Tfact;
-
-        if (285335.4 / T < 70.0)
-            GammaeHe0[i] = 2.38e-11 * sqrt(T) * exp(-285335.4 / T) * Tfact;
-
-        if (631515.0 / T < 70.0)
-            GammaeHep[i] = 5.68e-12 * sqrt(T) * exp(-631515.0 / T) * Tfact;
-    }
-}
-
-void coolsfr::IonizeParams()
-{
-    if (!All.ComovingIntegrationOn)
-    {
-        SetZeroIonization();
-        return;
-    }
-
-    // Get UV background from the TREECOOL table
-    IonizeParamsUVB();
-}
-
-void coolsfr::IonizeParamsUVB()
-{
-    if (!All.ComovingIntegrationOn)
-    {
-        SetZeroIonization();
-        return;
-    }
-
-    double redshift = 1.0 / All.Time - 1.0;
-    
-    if (nheattab == 1)
-    {
-        // Treat the one value given as constant with redshift
-        J_UV = 1;
-        gJH0 = gH0[0];
-        gJHe0 = gHe[0];
-        gJHep = gHep[0];
-        epsH0 = eH0[0];
-        epsHe0 = eHe[0];
-        epsHep = eHep[0];
-        return;
-    }
-
-    float logz = log10(redshift + 1.0);
-    int ilow = 0;
-    
-    for (int i = 0; i < nheattab; i++)
-    {
-        if (inlogz[i] < logz)
-            ilow = i;
-        else
-            break;
-    }
-
-    if (logz > inlogz[nheattab - 1] || ilow >= nheattab - 1)
-    {
-        // Beyond table range, use the last value
-        J_UV = 1;
-        gJH0 = gH0[nheattab - 1];
-        gJHe0 = gHe[nheattab - 1];
-        gJHep = gHep[nheattab - 1];
-        epsH0 = eH0[nheattab - 1];
-        epsHe0 = eHe[nheattab - 1];
-        epsHep = eHep[nheattab - 1];
-        return;
-    }
-
-    float dzlow = logz - inlogz[ilow];
-    float dzhi = inlogz[ilow + 1] - logz;
-
-    if (gH0[ilow] == 0 || gH0[ilow + 1] == 0)
-    {
-        SetZeroIonization();
-        return;
-    }
-
-    J_UV = 1;
-    
-    // Interpolate in log space
-    gJH0 = pow(10.0, (dzhi * log10(gH0[ilow]) + dzlow * log10(gH0[ilow + 1])) / (dzlow + dzhi));
-    gJHe0 = pow(10.0, (dzhi * log10(gHe[ilow]) + dzlow * log10(gHe[ilow + 1])) / (dzlow + dzhi));
-    gJHep = pow(10.0, (dzhi * log10(gHep[ilow]) + dzlow * log10(gHep[ilow + 1])) / (dzlow + dzhi));
-    epsH0 = pow(10.0, (dzhi * log10(eH0[ilow]) + dzlow * log10(eH0[ilow + 1])) / (dzlow + dzhi));
-    epsHe0 = pow(10.0, (dzhi * log10(eHe[ilow]) + dzlow * log10(eHe[ilow + 1])) / (dzlow + dzhi));
-    epsHep = pow(10.0, (dzhi * log10(eHep[ilow]) + dzlow * log10(eHep[ilow + 1])) / (dzlow + dzhi));
-}
-
-void coolsfr::SetZeroIonization()
-{
-    J_UV = gJHe0 = gJHep = gJH0 = epsHe0 = epsHep = epsH0 = 0.0;
-}
-
-double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_state *gs, do_cool_data *DoCool)
-{
-    DoCool->u_old_input = u_old;
-    DoCool->rho_input = rho;
-    DoCool->ne_guess_input = *ne_guess;
-
-    if(!gsl_finite(u_old))
-        Terminate("invalid input: u_old=%g\n", u_old);
-
-    if(u_old < 0 || rho < 0)
-        return 0;
-
-    double u = u_old;
-    gs->nHcgs = rho * HYDROGEN_MASSFRAC / PROTONMASS;
-    double ratefact = gs->nHcgs * gs->nHcgs / rho;
-
-    double LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, DoCool);
-
-    if(LambdaNet >= 0)
-        return 1.0e30;  // Very large number instead of VERY_LARGE_NUMBER
-
-    double coolingtime = u_old / (-ratefact * LambdaNet);
-
-    return coolingtime;
-}
-
-double coolsfr::convert_u_to_temp(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
-{
-    // Calculate mean molecular weight
-    double mu;
-    if(*ne_guess > 0) {
-        mu = (1.0 + 4.0 * gs->yhelium) / (1.0 + gs->yhelium + *ne_guess);
-    } else {
-        mu = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);
-    }
-    
-    // Convert internal energy to physical units
-    double u_phys = u * All.UnitMass_in_g / All.UnitEnergy_in_cgs;
-    
-    // Calculate temperature in Kelvin
-    double temp = u_phys * GAMMA_MINUS1 * PROTONMASS * mu / BOLTZMANN;
-    
-    // Return the actual calculated temperature without applying a floor
-    return temp;
-}
-
-void coolsfr::find_abundances_and_rates(double logT, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
-{
-    double T = pow(10.0, logT);
-    
-    if(!gsl_finite(logT))
-        Terminate("invalid input: logT=%g\n", logT);
-
-    gs->nH0 = gs->nHe0 = 1.0;
-    gs->nHp = gs->nHep = gs->nHepp = 0.0;
-    gs->ne = *ne_guess;
-
-    if(T >= 1.0e9)
-    {
-        // Fully ionized
-        gs->nH0 = 0.0;
-        gs->nHe0 = 0.0;
-        gs->nHep = 0.0;
-        gs->nHp = 1.0;
-        gs->nHepp = gs->yhelium;
-        gs->ne = gs->nHp + 2.0 * gs->nHepp;
-        *ne_guess = gs->ne;
-        return;
-    }
-
-    int j = (logT - log10(100.0)) / this->deltaT;
-    if(j < 0) j = 0;
-    if(j >= NCOOLTAB) j = NCOOLTAB - 1;
-
-    double fhi = (logT - (log10(100.0) + j * this->deltaT)) / this->deltaT;
-    double flow = 1.0 - fhi;
-
-    // Initialize with previous values
-    double neold = gs->ne;
-    gs->necgs = gs->ne * gs->nHcgs;
-
-    // Iteratively solve for ionization equilibrium
-    int niter = 0;
-    do
-    {
-        gs->aHp = flow * AlphaHp[j] + fhi * AlphaHp[j + 1];
-        gs->aHep = flow * AlphaHep[j] + fhi * AlphaHep[j + 1];
-        gs->aHepp = flow * AlphaHepp[j] + fhi * AlphaHepp[j + 1];
-        gs->ad = flow * Alphad[j] + fhi * Alphad[j + 1];
-        gs->geH0 = flow * GammaeH0[j] + fhi * GammaeH0[j + 1];
-        gs->geHe0 = flow * GammaeHe0[j] + fhi * GammaeHe0[j + 1];
-        gs->geHep = flow * GammaeHep[j] + fhi * GammaeHep[j + 1];
-
-        if(gs->necgs <= 1.e-25 || J_UV == 0)
-        {
-            gs->gJH0ne = gs->gJHe0ne = gs->gJHepne = 0;
-        }
-        else
-        {
-            gs->gJH0ne = gJH0 / gs->necgs;
-            gs->gJHe0ne = gJHe0 / gs->necgs;
-            gs->gJHepne = gJHep / gs->necgs;
-        }
-
-        // Calculate H ionization equilibrium
-        gs->nH0 = gs->aHp / (gs->aHp + gs->geH0 + gs->gJH0ne);
-        gs->nHp = 1.0 - gs->nH0;
-
-        // Calculate He ionization equilibrium
-        if((gs->gJHe0ne + gs->geHe0) <= 1.0e-60)
-        {
-            gs->nHe0 = gs->yhelium;
-            gs->nHep = gs->nHepp = 0;
-        }
-        else
-        {
-            gs->nHep = gs->yhelium / (1.0 + (gs->aHep + gs->ad) / (gs->geHe0 + gs->gJHe0ne) + (gs->geHep + gs->gJHepne) / gs->aHepp);
-            gs->nHe0 = gs->nHep * (gs->aHep + gs->ad) / (gs->geHe0 + gs->gJHe0ne);
-            gs->nHepp = gs->nHep * (gs->geHep + gs->gJHepne) / gs->aHepp;
-        }
-
-        // Update electron density
-        gs->ne = gs->nHp + gs->nHep + 2 * gs->nHepp;
-        gs->necgs = gs->ne * gs->nHcgs;
-
-        // Use average of new and old electron density for next iteration
-        double nenew = 0.5 * (gs->ne + neold);
-        gs->ne = nenew;
-        gs->necgs = gs->ne * gs->nHcgs;
-
-        // Check convergence
-        if(fabs(gs->ne - neold) < 1.0e-4)
-            break;
-
-        neold = gs->ne;
-        niter++;
-    }
-    while(niter < 1000);
-
-    // Calculate bremsstrahlung and other cooling rates
-    gs->bH0 = flow * BetaH0[j] + fhi * BetaH0[j + 1];
-    gs->bHep = flow * BetaHep[j] + fhi * BetaHep[j + 1];
-    gs->bff = flow * Betaff[j] + fhi * Betaff[j + 1];
-
-    *ne_guess = gs->ne;
-}
-
-double coolsfr::CoolingRate(double logT, double rho, double *nelec, gas_state *gs, const do_cool_data *DoCool)
-{
-    double Lambda, Heat;
-
-    if(logT < log10(100.0))
-        logT = log10(100.0);
-
-    find_abundances_and_rates(logT, rho, nelec, gs, DoCool);
-
-    double T = pow(10.0, logT);
-
-    // Collisional excitation cooling
-    double LambdaExcH0 = gs->bH0 * gs->ne * gs->nH0;
-    double LambdaExcHep = gs->bHep * gs->ne * gs->nHep;
-    double LambdaExc = LambdaExcH0 + LambdaExcHep;
-
-    // Collisional ionization cooling
-    double LambdaIonH0 = 2.18e-11 * gs->geH0 * gs->ne * gs->nH0;
-    double LambdaIonHe0 = 3.94e-11 * gs->geHe0 * gs->ne * gs->nHe0;
-    double LambdaIonHep = 8.72e-11 * gs->geHep * gs->ne * gs->nHep;
-    double LambdaIon = LambdaIonH0 + LambdaIonHe0 + LambdaIonHep;
-
-    // Recombination cooling
-    double LambdaRecHp = 1.036e-16 * T * gs->ne * (gs->aHp * gs->nHp);
-    double LambdaRecHep = 1.036e-16 * T * gs->ne * (gs->aHep * gs->nHep);
-    double LambdaRecHepp = 1.036e-16 * T * gs->ne * (gs->aHepp * gs->nHepp);
-    double LambdaRecHepd = 6.526e-11 * gs->ad * gs->ne * gs->nHep;
-    double LambdaRec = LambdaRecHp + LambdaRecHep + LambdaRecHepp + LambdaRecHepd;
-
-    // Free-free emission
-    double LambdaFF = gs->bff * (gs->nHp + gs->nHep + 4 * gs->nHepp) * gs->ne;
-
-    Lambda = LambdaExc + LambdaIon + LambdaRec + LambdaFF;
-
-    // Compton cooling/heating
-    double redshift = 1.0 / All.Time - 1.0;
-    double T_CMB = 2.7255 * (1.0 + redshift);
-    double LambdaCmptn = 5.65e-36 * gs->ne * (T - T_CMB) * pow(1.0 + redshift, 4) / gs->nHcgs;
-
-    Lambda += LambdaCmptn;
-
-    // Photoheating
-    Heat = 0;
-    if(J_UV != 0)
-        Heat += (gs->nH0 * epsH0 + gs->nHe0 * epsHe0 + gs->nHep * epsHep) / gs->nHcgs;
-
-    // Net cooling rate
-    return Heat - Lambda;
-}
-
-double coolsfr::CoolingRateFromU(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
-{
-    double temp = convert_u_to_temp(u, rho, ne_guess, gs, DoCool);
-    double logT = log10(temp);
-    
-    return CoolingRate(logT, rho, ne_guess, gs, DoCool);
-}
-
+/** \brief Compute the new internal energy per unit mass.
+ *
+ *   The function solves for the new internal energy per unit mass of the gas by integrating the equation
+ *   for the internal energy with an implicit Euler scheme. The root of resulting non linear equation,
+ *   which gives tnew internal energy, is found with the bisection method.
+ *   Arguments are passed in code units.
+ *
+ *   \param u_old the initial (before cooling is applied) internal energy per unit mass of the gas particle
+ *   \param rho   the proper density of the gas particle
+ *   \param dt    the duration of the time step
+ *   \param ne_guess electron number density relative to hydrogen number density (for molecular weight computation)
+ *   \return the new internal energy per unit mass of the gas particle
+ */
 double coolsfr::DoCooling(double u_old, double rho, double dt, double *ne_guess, gas_state *gs, do_cool_data *DoCool)
 {
-    // Safety checks for invalid input values
-    if(!gsl_finite(u_old) || u_old < 0 || rho <= 0 || dt < 0) {
-        // Handle the error case by returning a safe value
-        if(!gsl_finite(u_old))
-            mpi_printf("WARNING: Non-finite u_old=%g detected in DoCooling, returning minimum energy\n", u_old);
-        
-        // Return minimum allowed energy to avoid termination
-        return All.MinEgySpec;
-    }
+  DoCool->u_old_input    = u_old;
+  DoCool->rho_input      = rho;
+  DoCool->dt_input       = dt;
+  DoCool->ne_guess_input = *ne_guess;
 
-    DoCool->u_old_input = u_old;
-    DoCool->rho_input = rho;
-    DoCool->dt_input = dt;
-    DoCool->ne_guess_input = *ne_guess;
+  if(!gsl_finite(u_old))
+    Terminate("invalid input: u_old=%g\n", u_old);
 
-    if(dt == 0)
-        return u_old;
+  if(u_old < 0 || rho < 0)
+    Terminate("invalid input: u_old=%g  rho=%g  dt=%g  All.MinEgySpec=%g\n", u_old, rho, dt, All.MinEgySpec);
 
-    double u = u_old;
-    gs->nHcgs = rho * HYDROGEN_MASSFRAC / PROTONMASS;
-    double ratefact = gs->nHcgs * gs->nHcgs / rho;
+  rho *= All.UnitDensity_in_cgs * All.HubbleParam * All.HubbleParam; /* convert to physical cgs units */
+  u_old *= All.UnitPressure_in_cgs / All.UnitDensity_in_cgs;
+  dt *= All.UnitTime_in_s / All.HubbleParam;
 
-    // Safety check for cooling rate calculation
-    double LambdaNet;
-    try {
-        LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, DoCool);
-        if(!gsl_finite(LambdaNet)) {
-            mpi_printf("WARNING: Non-finite LambdaNet in DoCooling, returning original energy\n");
-            return u_old;
-        }
-    }
-    catch(...) {
-        mpi_printf("WARNING: Exception in CoolingRateFromU, returning original energy\n");
-        return u_old;
-    }
+  gs->nHcgs       = gs->XH * rho / PROTONMASS; /* hydrogen number dens in cgs units */
+  double ratefact = gs->nHcgs * gs->nHcgs / rho;
 
-    // No cooling if net heating
-    if(LambdaNet >= 0)
-        return u_old;
+  double u       = u_old;
+  double u_lower = u;
+  double u_upper = u;
 
-    // Use semi-implicit integration scheme
-    double m_old = 1.0;
-    double m = m_old;
-    double m_lower = m_old;
-    double m_upper = m_old;
+  double LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, DoCool);
 
-    if(m - m_old - m_old * ratefact * LambdaNet * dt > 0)
+  /* bracketing */
+
+  if(u - u_old - ratefact * LambdaNet * dt < 0) /* heating */
     {
-        // We may want even a smaller timestep
-        m_upper *= 1.1;
-        m_lower /= 1.1;
-
-        int safety_counter = 0;
-        while(m_lower - m_old - m_lower * m_lower / m_old * ratefact * CoolingRateFromU(u, rho * m_lower / m_old, ne_guess, gs, DoCool) * dt > 0)
+      u_upper *= sqrt(1.1);
+      u_lower /= sqrt(1.1);
+      while(u_upper - u_old - ratefact * CoolingRateFromU(u_upper, rho, ne_guess, gs, DoCool) * dt < 0)
         {
-            m_upper = m_lower;
-            m_lower /= 1.1;
-            
-            // Safety check to avoid infinite loops
-            safety_counter++;
-            if(m_lower < 1e-10 || safety_counter > 100)
-                break;
+          u_upper *= 1.1;
+          u_lower *= 1.1;
         }
     }
 
-    // Bisection method to find the new internal energy
-    int iter = 0;
-    double dm;
-    do
+  if(u - u_old - ratefact * LambdaNet * dt > 0)
     {
-        m = 0.5 * (m_lower + m_upper);
-        
-        // Safety check for cooling rate during bisection
-        double tempLambdaNet;
-        try {
-            tempLambdaNet = CoolingRateFromU(u, rho * m / m_old, ne_guess, gs, DoCool);
-            if(!gsl_finite(tempLambdaNet)) {
-                mpi_printf("WARNING: Non-finite LambdaNet in bisection, breaking\n");
-                break;
-            }
+      u_lower /= sqrt(1.1);
+      u_upper *= sqrt(1.1);
+      while(u_lower - u_old - ratefact * CoolingRateFromU(u_lower, rho, ne_guess, gs, DoCool) * dt > 0)
+        {
+          u_upper /= 1.1;
+          u_lower /= 1.1;
         }
-        catch(...) {
-            mpi_printf("WARNING: Exception in CoolingRateFromU during bisection, breaking\n");
+    }
+
+  int iter = 0;
+  double du;
+  do
+    {
+      u = 0.5 * (u_lower + u_upper);
+
+      LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, DoCool);
+
+      if(u - u_old - ratefact * LambdaNet * dt > 0)
+        {
+          u_upper = u;
+        }
+      else
+        {
+          u_lower = u;
+        }
+
+      du = u_upper - u_lower;
+
+      iter++;
+
+      if(iter >= (MAXITER - 10))
+        printf("u= %g\n", u);
+    }
+  while(fabs(du / u) > 1.0e-6 && iter < MAXITER);
+
+  if(iter >= MAXITER)
+    Terminate(
+        "failed to converge in DoCooling(): DoCool->u_old_input=%g\nDoCool->rho_input= %g\nDoCool->dt_input= "
+        "%g\nDoCool->ne_guess_input= %g\n",
+        DoCool->u_old_input, DoCool->rho_input, DoCool->dt_input, DoCool->ne_guess_input);
+
+  u *= All.UnitDensity_in_cgs / All.UnitPressure_in_cgs; /* to internal units */
+
+  return u;
+}
+
+/** \brief Return the cooling time.
+ *
+ *  If we actually have heating, a cooling time of 0 is returned.
+ *
+ *  \param u_old the initial (before cooling is applied) internal energy per unit mass of the gas particle
+ *  \param rho   the proper density of the gas particle
+ *  \param ne_guess electron number density relative to hydrogen number density (for molecular weight computation)
+ */
+double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_state *gs, do_cool_data *DoCool)
+{
+  DoCool->u_old_input    = u_old;
+  DoCool->rho_input      = rho;
+  DoCool->ne_guess_input = *ne_guess;
+
+  rho *= All.UnitDensity_in_cgs * All.HubbleParam * All.HubbleParam; /* convert to physical cgs units */
+  u_old *= All.UnitPressure_in_cgs / All.UnitDensity_in_cgs;
+
+  gs->nHcgs       = gs->XH * rho / PROTONMASS; /* hydrogen number dens in cgs units */
+  double ratefact = gs->nHcgs * gs->nHcgs / rho;
+
+  double u = u_old;
+
+  double LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, DoCool);
+
+  /* bracketing */
+
+  if(LambdaNet >= 0) /* ups, we have actually heating due to UV background */
+    return 0;
+
+  double coolingtime = u_old / (-ratefact * LambdaNet);
+
+  coolingtime *= All.HubbleParam / All.UnitTime_in_s;
+
+  return coolingtime;
+}
+
+/** \brief Compute gas temperature from internal energy per unit mass.
+ *
+ *   This function determines the electron fraction, and hence the mean
+ *   molecular weight. With it arrives at a self-consistent temperature.
+ *   Element abundances and the rates for the emission are also computed
+ *
+ *  \param u   internal energy per unit mass
+ *  \param rho gas density
+ *  \param ne_guess electron number density relative to hydrogen number density
+ *  \return the gas temperature
+ */
+double coolsfr::convert_u_to_temp(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
+{
+  double u_input   = u;
+  double rho_input = rho;
+  double ne_input  = *ne_guess;
+
+  double mu   = (1 + 4 * gs->yhelium) / (1 + gs->yhelium + *ne_guess);
+  double temp = GAMMA_MINUS1 / BOLTZMANN * u * PROTONMASS * mu;
+
+  double max = 0;
+  int iter   = 0;
+  double temp_old;
+  do
+    {
+      double ne_old = *ne_guess;
+
+      find_abundances_and_rates(log10(temp), rho, ne_guess, gs, DoCool);
+      temp_old = temp;
+
+      mu = (1 + 4 * gs->yhelium) / (1 + gs->yhelium + *ne_guess);
+
+      double temp_new = GAMMA_MINUS1 / BOLTZMANN * u * PROTONMASS * mu;
+
+      max = std::max<double>(max, temp_new / (1 + gs->yhelium + *ne_guess) * fabs((*ne_guess - ne_old) / (temp_new - temp_old + 1.0)));
+
+      temp = temp_old + (temp_new - temp_old) / (1 + max);
+      iter++;
+
+      if(iter > (MAXITER - 10))
+        printf("-> temp= %g ne=%g\n", temp, *ne_guess);
+    }
+  while(fabs(temp - temp_old) > 1.0e-3 * temp && iter < MAXITER);
+
+  if(iter >= MAXITER)
+    {
+      printf("failed to converge in convert_u_to_temp()\n");
+      printf("u_input= %g\nrho_input=%g\n ne_input=%g\n", u_input, rho_input, ne_input);
+      printf("DoCool->u_old_input=%g\nDoCool->rho_input= %g\nDoCool->dt_input= %g\nDoCool->ne_guess_input= %g\n", DoCool->u_old_input,
+             DoCool->rho_input, DoCool->dt_input, DoCool->ne_guess_input);
+      Terminate("convergence failure");
+    }
+
+  return temp;
+}
+
+/** \brief Computes the actual abundance ratios.
+ *
+ *  The chemical composition of the gas is primordial (no metals are present)
+ *
+ *  \param logT     log10 of gas temperature
+ *  \param rho      gas density
+ *  \param ne_guess electron number density relative to hydrogen number density
+ */
+void coolsfr::find_abundances_and_rates(double logT, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
+{
+  double logT_input = logT;
+  double rho_input  = rho;
+  double ne_input   = *ne_guess;
+
+  if(!gsl_finite(logT))
+    Terminate("logT=%g\n", logT);
+
+  if(logT <= Tmin) /* everything neutral */
+    {
+      gs->nH0   = 1.0;
+      gs->nHe0  = gs->yhelium;
+      gs->nHp   = 0;
+      gs->nHep  = 0;
+      gs->nHepp = 0;
+      gs->ne    = 0;
+      *ne_guess = 0;
+      return;
+    }
+
+  if(logT >= Tmax) /* everything is ionized */
+    {
+      gs->nH0   = 0;
+      gs->nHe0  = 0;
+      gs->nHp   = 1.0;
+      gs->nHep  = 0;
+      gs->nHepp = gs->yhelium;
+      gs->ne    = gs->nHp + 2.0 * gs->nHepp;
+      *ne_guess = gs->ne; /* note: in units of the hydrogen number density */
+      return;
+    }
+
+  double t    = (logT - Tmin) / deltaT;
+  int j       = (int)t;
+  double fhi  = t - j;
+  double flow = 1 - fhi;
+
+  if(*ne_guess == 0)
+    *ne_guess = 1.0;
+
+  gs->nHcgs = gs->XH * rho / PROTONMASS; /* hydrogen number dens in cgs units */
+
+  gs->ne       = *ne_guess;
+  double neold = gs->ne;
+  int niter    = 0;
+  gs->necgs    = gs->ne * gs->nHcgs;
+
+  /* evaluate number densities iteratively (cf KWH eqns 33-38) in units of nH */
+  do
+    {
+      niter++;
+
+      gs->aHp   = flow * RateT[j].AlphaHp + fhi * RateT[j + 1].AlphaHp;
+      gs->aHep  = flow * RateT[j].AlphaHep + fhi * RateT[j + 1].AlphaHep;
+      gs->aHepp = flow * RateT[j].AlphaHepp + fhi * RateT[j + 1].AlphaHepp;
+      gs->ad    = flow * RateT[j].Alphad + fhi * RateT[j + 1].Alphad;
+      gs->geH0  = flow * RateT[j].GammaeH0 + fhi * RateT[j + 1].GammaeH0;
+      gs->geHe0 = flow * RateT[j].GammaeHe0 + fhi * RateT[j + 1].GammaeHe0;
+      gs->geHep = flow * RateT[j].GammaeHep + fhi * RateT[j + 1].GammaeHep;
+
+      if(gs->necgs <= 1.e-25 || pc.J_UV == 0)
+        {
+          gs->gJH0ne = gs->gJHe0ne = gs->gJHepne = 0;
+        }
+      else
+        {
+          gs->gJH0ne  = pc.gJH0 / gs->necgs;
+          gs->gJHe0ne = pc.gJHe0 / gs->necgs;
+          gs->gJHepne = pc.gJHep / gs->necgs;
+        }
+
+      gs->nH0 = gs->aHp / (gs->aHp + gs->geH0 + gs->gJH0ne); /* eqn (33) */
+      gs->nHp = 1.0 - gs->nH0;                               /* eqn (34) */
+
+      if((gs->gJHe0ne + gs->geHe0) <= SMALLNUM) /* no ionization at all */
+        {
+          gs->nHep  = 0.0;
+          gs->nHepp = 0.0;
+          gs->nHe0  = gs->yhelium;
+        }
+      else
+        {
+          gs->nHep = gs->yhelium /
+                     (1.0 + (gs->aHep + gs->ad) / (gs->geHe0 + gs->gJHe0ne) + (gs->geHep + gs->gJHepne) / gs->aHepp); /* eqn (35) */
+          gs->nHe0  = gs->nHep * (gs->aHep + gs->ad) / (gs->geHe0 + gs->gJHe0ne);                                     /* eqn (36) */
+          gs->nHepp = gs->nHep * (gs->geHep + gs->gJHepne) / gs->aHepp;                                               /* eqn (37) */
+        }
+
+      neold = gs->ne;
+
+      gs->ne    = gs->nHp + gs->nHep + 2 * gs->nHepp; /* eqn (38) */
+      gs->necgs = gs->ne * gs->nHcgs;
+
+      if(pc.J_UV == 0)
+        break;
+
+      double nenew = 0.5 * (gs->ne + neold);
+      gs->ne       = nenew;
+      gs->necgs    = gs->ne * gs->nHcgs;
+
+      if(fabs(gs->ne - neold) < 1.0e-4)
+        break;
+
+      if(niter > (MAXITER - 10))
+        printf("ne= %g  niter=%d\n", gs->ne, niter);
+    }
+  while(niter < MAXITER);
+
+  if(niter >= MAXITER)
+    Terminate(
+        "no convergence reached in find_abundances_and_rates(): logT_input= %g  rho_input= %g  ne_input= %g "
+        "DoCool->u_old_input=%g\nDoCool->rho_input= %g\nDoCool->dt_input= %g\nDoCool->ne_guess_input= %g\n",
+        logT_input, rho_input, ne_input, DoCool->u_old_input, DoCool->rho_input, DoCool->dt_input, DoCool->ne_guess_input);
+
+  gs->bH0  = flow * RateT[j].BetaH0 + fhi * RateT[j + 1].BetaH0;
+  gs->bHep = flow * RateT[j].BetaHep + fhi * RateT[j + 1].BetaHep;
+  gs->bff  = flow * RateT[j].Betaff + fhi * RateT[j + 1].Betaff;
+
+  *ne_guess = gs->ne;
+}
+
+/** \brief Get cooling rate from gas internal energy.
+ *
+ *  This function first computes the self-consistent temperature
+ *  and abundance ratios, and then it calculates
+ *  (heating rate-cooling rate)/n_h^2 in cgs units
+ *
+ *  \param u   gas internal energy per unit mass
+ *  \param rho gas density
+ *  \param ne_guess electron number density relative to hydrogen number density
+ */
+double coolsfr::CoolingRateFromU(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
+{
+  double temp = convert_u_to_temp(u, rho, ne_guess, gs, DoCool);
+
+  return CoolingRate(log10(temp), rho, ne_guess, gs, DoCool);
+}
+
+/** \brief  This function computes the self-consistent temperature and abundance ratios.
+ *
+ *  Used only in the file io.c (maybe it is not necessary)
+ *
+ *  \param u   internal energy per unit mass
+ *  \param rho gas density
+ *  \param ne_guess electron number density relative to hydrogen number density
+ *  \param nH0_pointer pointer to the neutral hydrogen fraction (set to current value in the GasState struct)
+ *  \param nHeII_pointer pointer to the ionised helium fraction (set to current value in the GasState struct)
+ */
+double coolsfr::AbundanceRatios(double u, double rho, double *ne_guess, double *nH0_pointer, double *nHeII_pointer)
+{
+  gas_state gs          = GasState;
+  do_cool_data DoCool   = DoCoolData;
+  DoCool.u_old_input    = u;
+  DoCool.rho_input      = rho;
+  DoCool.ne_guess_input = *ne_guess;
+
+  rho *= All.UnitDensity_in_cgs * All.HubbleParam * All.HubbleParam; /* convert to physical cgs units */
+  u *= All.UnitPressure_in_cgs / All.UnitDensity_in_cgs;
+
+  double temp = convert_u_to_temp(u, rho, ne_guess, &gs, &DoCool);
+
+  *nH0_pointer   = gs.nH0;
+  *nHeII_pointer = gs.nHep;
+
+  return temp;
+}
+
+/** \brief  Calculate (heating rate-cooling rate)/n_h^2 in cgs units.
+ *
+ *  \param logT     log10 of gas temperature
+ *  \param rho      gas density
+ *  \param nelec    electron number density relative to hydrogen number density
+ *  \return         (heating rate-cooling rate)/n_h^2
+ */
+double coolsfr::CoolingRate(double logT, double rho, double *nelec, gas_state *gs, const do_cool_data *DoCool)
+{
+  double Lambda, Heat;
+
+  if(logT <= Tmin)
+    logT = Tmin + 0.5 * deltaT; /* floor at Tmin */
+
+  gs->nHcgs = gs->XH * rho / PROTONMASS; /* hydrogen number dens in cgs units */
+
+  if(logT < Tmax)
+    {
+      find_abundances_and_rates(logT, rho, nelec, gs, DoCool);
+
+      /* Compute cooling and heating rate (cf KWH Table 1) in units of nH**2 */
+      double T = pow(10.0, logT);
+
+      double LambdaExcH0   = gs->bH0 * gs->ne * gs->nH0;
+      double LambdaExcHep  = gs->bHep * gs->ne * gs->nHep;
+      double LambdaExc     = LambdaExcH0 + LambdaExcHep; /* excitation */
+      double LambdaIonH0   = 2.18e-11 * gs->geH0 * gs->ne * gs->nH0;
+      double LambdaIonHe0  = 3.94e-11 * gs->geHe0 * gs->ne * gs->nHe0;
+      double LambdaIonHep  = 8.72e-11 * gs->geHep * gs->ne * gs->nHep;
+      double LambdaIon     = LambdaIonH0 + LambdaIonHe0 + LambdaIonHep; /* ionization */
+      double LambdaRecHp   = 1.036e-16 * T * gs->ne * (gs->aHp * gs->nHp);
+      double LambdaRecHep  = 1.036e-16 * T * gs->ne * (gs->aHep * gs->nHep);
+      double LambdaRecHepp = 1.036e-16 * T * gs->ne * (gs->aHepp * gs->nHepp);
+      double LambdaRecHepd = 6.526e-11 * gs->ad * gs->ne * gs->nHep;
+      double LambdaRec     = LambdaRecHp + LambdaRecHep + LambdaRecHepp + LambdaRecHepd;
+      double LambdaFF      = gs->bff * (gs->nHp + gs->nHep + 4 * gs->nHepp) * gs->ne;
+      Lambda               = LambdaExc + LambdaIon + LambdaRec + LambdaFF;
+
+      if(All.ComovingIntegrationOn)
+        {
+          double redshift    = 1 / All.Time - 1;
+          double LambdaCmptn = 5.65e-36 * gs->ne * (T - 2.73 * (1. + redshift)) * pow(1. + redshift, 4.) / gs->nHcgs;
+
+          Lambda += LambdaCmptn;
+        }
+
+      Heat = 0;
+      if(pc.J_UV != 0)
+        Heat += (gs->nH0 * pc.epsH0 + gs->nHe0 * pc.epsHe0 + gs->nHep * pc.epsHep) / gs->nHcgs;
+    }
+  else /* here we're outside of tabulated rates, T>Tmax K */
+    {
+      /* at high T (fully ionized); only free-free and Compton cooling are present. Assumes no heating. */
+
+      Heat = 0;
+
+      /* very hot: H and He both fully ionized */
+      gs->nHp   = 1.0;
+      gs->nHep  = 0;
+      gs->nHepp = gs->yhelium;
+      gs->ne    = gs->nHp + 2.0 * gs->nHepp;
+      *nelec    = gs->ne; /* note: in units of the hydrogen number density */
+
+      double T        = pow(10.0, logT);
+      double LambdaFF = 1.42e-27 * sqrt(T) * (1.1 + 0.34 * exp(-(5.5 - logT) * (5.5 - logT) / 3)) * (gs->nHp + 4 * gs->nHepp) * gs->ne;
+      double LambdaCmptn;
+      if(All.ComovingIntegrationOn)
+        {
+          double redshift = 1 / All.Time - 1;
+          /* add inverse Compton cooling off the microwave background */
+          LambdaCmptn = 5.65e-36 * gs->ne * (T - 2.73 * (1. + redshift)) * pow(1. + redshift, 4.) / gs->nHcgs;
+        }
+      else
+        LambdaCmptn = 0;
+
+      Lambda = LambdaFF + LambdaCmptn;
+    }
+
+  return (Heat - Lambda);
+}
+
+/** \brief Make cooling rates interpolation table.
+ *
+ *  Set up interpolation tables in T for cooling rates given in KWH, ApJS, 105, 19
+ */
+void coolsfr::MakeRateTable(void)
+{
+  GasState.yhelium = (1 - GasState.XH) / (4 * GasState.XH);
+  GasState.mhboltz = PROTONMASS / BOLTZMANN;
+
+  deltaT          = (Tmax - Tmin) / NCOOLTAB;
+  GasState.ethmin = pow(10.0, Tmin) * (1. + GasState.yhelium) / ((1. + 4. * GasState.yhelium) * GasState.mhboltz * GAMMA_MINUS1);
+  /* minimum internal energy for neutral gas */
+
+  for(int i = 0; i <= NCOOLTAB; i++)
+    {
+      RateT[i].BetaH0 = RateT[i].BetaHep = RateT[i].Betaff = RateT[i].AlphaHp = RateT[i].AlphaHep = RateT[i].AlphaHepp =
+          RateT[i].Alphad = RateT[i].GammaeH0 = RateT[i].GammaeHe0 = RateT[i].GammaeHep = 0;
+
+      double T     = pow(10.0, Tmin + deltaT * i);
+      double Tfact = 1.0 / (1 + sqrt(T / 1.0e5));
+
+      /* collisional excitation */
+      /* Cen 1992 */
+      if(118348 / T < 70)
+        RateT[i].BetaH0 = 7.5e-19 * exp(-118348 / T) * Tfact;
+      if(473638 / T < 70)
+        RateT[i].BetaHep = 5.54e-17 * pow(T, -0.397) * exp(-473638 / T) * Tfact;
+
+      /* free-free */
+      RateT[i].Betaff = 1.43e-27 * sqrt(T) * (1.1 + 0.34 * exp(-(5.5 - log10(T)) * (5.5 - log10(T)) / 3));
+
+      /* recombination */
+
+      /* Cen 1992 */
+      /* Hydrogen II */
+      RateT[i].AlphaHp = 8.4e-11 * pow(T / 1000, -0.2) / (1. + pow(T / 1.0e6, 0.7)) / sqrt(T);
+      /* Helium II */
+      RateT[i].AlphaHep = 1.5e-10 * pow(T, -0.6353);
+      /* Helium III */
+      RateT[i].AlphaHepp = 4. * RateT[i].AlphaHp;
+      /* Cen 1992 */
+      /* dielectric recombination */
+      if(470000 / T < 70)
+        RateT[i].Alphad = 1.9e-3 * pow(T, -1.5) * exp(-470000 / T) * (1. + 0.3 * exp(-94000 / T));
+
+      /* collisional ionization */
+      /* Cen 1992 */
+      /* Hydrogen */
+      if(157809.1 / T < 70)
+        RateT[i].GammaeH0 = 5.85e-11 * sqrt(T) * exp(-157809.1 / T) * Tfact;
+      /* Helium */
+      if(285335.4 / T < 70)
+        RateT[i].GammaeHe0 = 2.38e-11 * sqrt(T) * exp(-285335.4 / T) * Tfact;
+      /* Hellium II */
+      if(631515.0 / T < 70)
+        RateT[i].GammaeHep = 5.68e-12 * sqrt(T) * exp(-631515.0 / T) * Tfact;
+    }
+}
+
+/** \brief Read table input for ionizing parameters.
+ *
+ *  \param file that contains the tabulated parameters
+ */
+void coolsfr::ReadIonizeParams(char *fname)
+{
+  NheattabUVB = 0;
+  int i, iter;
+  for(iter = 0, i = 0; iter < 2; iter++)
+    {
+      FILE *fdcool;
+      if(!(fdcool = fopen(fname, "r")))
+        Terminate(" Cannot read ionization table in file `%s'\n", fname);
+      if(iter == 0)
+        while(fscanf(fdcool, "%*g %*g %*g %*g %*g %*g %*g") != EOF)
+          NheattabUVB++;
+      if(iter == 1)
+        while(fscanf(fdcool, "%g %g %g %g %g %g %g", &PhotoTUVB[i].variable, &PhotoTUVB[i].gH0, &PhotoTUVB[i].gHe, &PhotoTUVB[i].gHep,
+                     &PhotoTUVB[i].eH0, &PhotoTUVB[i].eHe, &PhotoTUVB[i].eHep) != EOF)
+          i++;
+      fclose(fdcool);
+
+      if(iter == 0)
+        {
+          PhotoTUVB = (photo_table *)Mem.mymalloc("PhotoT", NheattabUVB * sizeof(photo_table));
+          mpi_printf("COOLING: read ionization table with %d entries in file `%s'.\n", NheattabUVB, fname);
+        }
+    }
+  /* ignore zeros at end of treecool file */
+  for(i = 0; i < NheattabUVB; ++i)
+    if(PhotoTUVB[i].gH0 == 0.0)
+      break;
+
+  NheattabUVB = i;
+  mpi_printf("COOLING: using %d ionization table entries from file `%s'.\n", NheattabUVB, fname);
+
+  if(NheattabUVB < 1)
+    Terminate("The length of the cooling table has to have at least one entry");
+}
+
+/** \brief Set the ionization parameters for the UV background.
+ */
+void coolsfr::IonizeParamsUVB(void)
+{
+  if(!All.ComovingIntegrationOn)
+    {
+      SetZeroIonization();
+      return;
+    }
+
+  if(NheattabUVB == 1)
+    {
+      /* treat the one value given as constant with redshift */
+      pc.J_UV   = 1;
+      pc.gJH0   = PhotoTUVB[0].gH0;
+      pc.gJHe0  = PhotoTUVB[0].gHe;
+      pc.gJHep  = PhotoTUVB[0].gHep;
+      pc.epsH0  = PhotoTUVB[0].eH0;
+      pc.epsHe0 = PhotoTUVB[0].eHe;
+      pc.epsHep = PhotoTUVB[0].eHep;
+    }
+  else
+    {
+      double redshift = 1 / All.Time - 1;
+      double logz     = log10(redshift + 1.0);
+      int ilow        = 0;
+      for(int i = 0; i < NheattabUVB; i++)
+        {
+          if(PhotoTUVB[i].variable < logz)
+            ilow = i;
+          else
             break;
         }
 
-        if(m - m_old - m * m / m_old * ratefact * tempLambdaNet * dt > 0)
-            m_upper = m;
-        else
-            m_lower = m;
+      if(logz > PhotoTUVB[NheattabUVB - 1].variable || ilow >= NheattabUVB - 1)
+        {
+          SetZeroIonization();
+        }
+      else
+        {
+          double dzlow = logz - PhotoTUVB[ilow].variable;
+          double dzhi  = PhotoTUVB[ilow + 1].variable - logz;
 
-        dm = m_upper - m_lower;
-        iter++;
-
-        if(iter >= 150) {
-            mpi_printf("slow convergence in DoCooling: m_up=%g, m_low=%g, dm/m=%g\n", m_upper, m_lower, dm / m);
+          if(PhotoTUVB[ilow].gH0 == 0 || PhotoTUVB[ilow + 1].gH0 == 0)
+            {
+              SetZeroIonization();
+            }
+          else
+            {
+              pc.J_UV   = 1;
+              pc.gJH0   = pow(10., (dzhi * log10(PhotoTUVB[ilow].gH0) + dzlow * log10(PhotoTUVB[ilow + 1].gH0)) / (dzlow + dzhi));
+              pc.gJHe0  = pow(10., (dzhi * log10(PhotoTUVB[ilow].gHe) + dzlow * log10(PhotoTUVB[ilow + 1].gHe)) / (dzlow + dzhi));
+              pc.gJHep  = pow(10., (dzhi * log10(PhotoTUVB[ilow].gHep) + dzlow * log10(PhotoTUVB[ilow + 1].gHep)) / (dzlow + dzhi));
+              pc.epsH0  = pow(10., (dzhi * log10(PhotoTUVB[ilow].eH0) + dzlow * log10(PhotoTUVB[ilow + 1].eH0)) / (dzlow + dzhi));
+              pc.epsHe0 = pow(10., (dzhi * log10(PhotoTUVB[ilow].eHe) + dzlow * log10(PhotoTUVB[ilow + 1].eHe)) / (dzlow + dzhi));
+              pc.epsHep = pow(10., (dzhi * log10(PhotoTUVB[ilow].eHep) + dzlow * log10(PhotoTUVB[ilow + 1].eHep)) / (dzlow + dzhi));
+            }
         }
     }
-    while(fabs(dm / m) > 1.0e-6 && iter < 100);  // Reduced max iterations for safety
-
-    // Calculate new internal energy
-    u = u_old * m / m_old;
-    
-    // Final safety check for output value
-    if(!gsl_finite(u) || u < 0) {
-        mpi_printf("WARNING: Invalid energy result in DoCooling u=%g, returning minimum energy\n", u);
-        return All.MinEgySpec;
-    }
-    
-    // Limit cooling to reasonable values
-    if(u < 0.1 * u_old)
-        u = 0.1 * u_old;
-    
-    // Make sure we don't fall below minimum energy
-    if(u < All.MinEgySpec)
-        u = All.MinEgySpec;
-
-    return u;
 }
 
-void coolsfr::cooling_only(simparticles *Sp)
+/** \brief Reset the ionization parameters.
+ */
+void coolsfr::SetZeroIonization(void) { memset(&pc, 0, sizeof(photo_current)); }
+
+/** \brief Wrapper function to set the ionizing background.
+ */
+void coolsfr::IonizeParams(void) { IonizeParamsUVB(); }
+
+/** \brief Initialize the cooling module.
+ *
+ *   This function initializes the cooling module. In particular,
+ *   it allocates the memory for the cooling rate and ionization tables
+ *   and initializes them.
+ */
+/** \brief Initialize the cooling module by loading TREECOOL tables */
+void coolsfr::InitCool(void)
 {
-    TIMER_START(CPU_COOLING_SFR);
-    
-    // Update cosmological factors and ionization parameters
+    GasState.XH = HYDROGEN_MASSFRAC;
+    SetZeroIonization();
+
+    // — allocate the table and fill it with TREECOOL data —
+    InitCoolMemory();       // <— your new allocator
+    MakeCoolingTable();     // <— this should now write into RateT[0…NCOOLTAB]
+
+    // — UV/photo-heating as before —
+    ReadIonizeParams(All.TreecoolFile);
+    All.Time = All.TimeBegin;
     All.set_cosmo_factors_for_current_time();
     IonizeParams();
-    
-    gas_state gs = GasState;
-    do_cool_data DoCool = DoCoolData;
-    
-    for(int i = 0; i < Sp->TimeBinsHydro.NActiveParticles; i++)
-    {
-        int target = Sp->TimeBinsHydro.ActiveParticleList[i];
-        if(Sp->P[target].getType() == 0)
-        {
-            if(Sp->P[target].getMass() == 0 && Sp->P[target].ID.get() == 0)
-                continue; /* skip particles that have been swallowed or eliminated */
-            
-            // Apply cooling to this particle
-            cool_sph_particle(Sp, target, &gs, &DoCool);
-        }
-    }
-    
-    TIMER_STOP(CPU_COOLING_SFR);
 }
 
+
+/** \brief Apply the isochoric cooling to all the active gas particles.
+ *
+ */
+void coolsfr::cooling_only(simparticles *Sp) /* normal cooling routine when star formation is disabled */
+{
+  TIMER_START(CPU_COOLING_SFR);
+  All.set_cosmo_factors_for_current_time();
+
+  gas_state gs        = GasState;
+  do_cool_data DoCool = DoCoolData;
+
+  for(int i = 0; i < Sp->TimeBinsHydro.NActiveParticles; i++)
+    {
+      int target = Sp->TimeBinsHydro.ActiveParticleList[i];
+      if(Sp->P[target].getType() == 0)
+        {
+          if(Sp->P[target].getMass() == 0 && Sp->P[target].ID.get() == 0)
+            continue; /* skip particles that have been swallowed or eliminated */
+
+          cool_sph_particle(Sp, target, &gs, &DoCool);
+        }
+    }
+  TIMER_STOP(CPU_COOLING_SFR);
+}
+
+/** \brief Apply the isochoric cooling to a given gas particle.
+ *
+ *  This function applies the normal isochoric cooling to a single gas particle.
+ *  Once the cooling has been applied according to one of the cooling models implemented,
+ *  the internal energy per unit mass, the total energy and the pressure of the particle are updated.
+ *
+ *  \param i index of the gas particle to which cooling is applied
+ */
 void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_data *DoCool)
 {
-    // Get particle properties
-    double dt = (Sp->P[i].getTimeBinHydro() ? (((integertime)1) << Sp->P[i].getTimeBinHydro()) : 0) * All.Timebase_interval;
-    double ne = Sp->SphP[i].Ne;
-    double rho = Sp->SphP[i].Density;
-    double u_old = Sp->get_utherm_from_entropy(i);
-    
-    // Apply cooling
-    double unew = DoCooling(u_old, rho, dt, &ne, gs, DoCool);
-    
-    // Limit maximum energy change per timestep to improve stability
-    double max_change_factor = 1.2; // Allow at most 20% change per step
-    if(unew > max_change_factor * u_old)
-        unew = max_change_factor * u_old;
-    else if(unew < u_old / max_change_factor)
-        unew = u_old / max_change_factor;
-    
-    // Get temperature after cooling
-    double temp_new = convert_u_to_temp(unew, rho, &ne, gs, DoCool);
-    
-    // Density-dependent temperature floor: T_min ∝ ρ^(γ-1)
-    double rho_physical = rho * All.cf_a3inv;
-    double rho_ref = 1e-30;  // Reference density in g/cm³
-    double temp_ref = 10.0;  // Temperature floor at reference density
-    
-    // Calculate minimum temperature based on adiabatic relation
-    double temp_min = temp_ref * pow(rho_physical / rho_ref, GAMMA_MINUS1);
-    
-    // Apply the density-dependent floor
-    if(temp_new < temp_min) {
-        double mean_weight = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);
-        unew = BOLTZMANN * temp_min / (mean_weight * PROTONMASS * GAMMA_MINUS1);
-        unew /= (All.UnitVelocity_in_cm_per_s * All.UnitVelocity_in_cm_per_s);
-        
-        if(ThisTask == 0 && i % 1000 == 0) {
-            mpi_printf("FLOOR_APPLIED: Part %d rho=%g T_after_cooling=%g T_floor=%g\n",
-                      Sp->P[i].ID.get(), rho_physical, temp_new, temp_min);
-        }
-    }
-    
-    // Update particle properties
-    Sp->SphP[i].Ne = ne;
-    Sp->set_entropy_from_utherm(unew, i);
-    Sp->SphP[i].set_thermodynamic_variables();
+  double dens = Sp->SphP[i].Density;
+
+  double dt = (Sp->P[i].getTimeBinHydro() ? (((integertime)1) << Sp->P[i].getTimeBinHydro()) : 0) * All.Timebase_interval;
+
+  double dtime = All.cf_atime * dt / All.cf_atime_hubble_a;
+
+  double utherm = Sp->get_utherm_from_entropy(i);
+
+  double ne      = Sp->SphP[i].Ne; /* electron abundance (gives ionization state and mean molecular weight) */
+  double unew    = DoCooling(std::max<double>(All.MinEgySpec, utherm), dens * All.cf_a3inv, dtime, &ne, gs, DoCool);
+  Sp->SphP[i].Ne = ne;
+
+  if(unew < 0)
+    Terminate("invalid temperature: i=%d unew=%g\n", i, unew);
+
+  double du = unew - utherm;
+
+  if(unew < All.MinEgySpec)
+    du = All.MinEgySpec - utherm;
+
+  utherm += du;
+
+#ifdef OUTPUT_COOLHEAT
+  if(dtime > 0)
+    Sp->SphP[i].CoolHeat = du * Sp->P[i].getMass() / dtime;
+#endif
+
+  Sp->set_entropy_from_utherm(utherm, i);
+  Sp->SphP[i].set_thermodynamic_variables();
 }
 
-
-#endif /* COOLING */
+#endif

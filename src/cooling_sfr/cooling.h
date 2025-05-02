@@ -31,7 +31,7 @@ class coolsfr : public setcomm
   void MakeCoolingTable();
   void IonizeParams();
   void IonizeParamsTable();
-
+  void InitCoolMemory(void);
   void cooling_only(simparticles *Sp);
 
 #ifdef STARFORMATION
@@ -46,6 +46,9 @@ class coolsfr : public setcomm
   void cooling_and_starformation(simparticles *Sp);
   void debug_energy_temp_conversion(void);
   
+void InitCoolMemory(void);
+void MakeCoolingTable(void);
+
   #ifdef WINDS
     void winds_effective_model(simparticles *Sp, int i, double dt, double sfr, double cloudMassFraction);
   #endif
