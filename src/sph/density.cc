@@ -600,42 +600,38 @@ void sph::density(int *list, int ntarget)
                     SphP[target].Hsml = pow(0.5 * (pow(Left[target], NUMDIMS) + pow(Right[target], NUMDIMS)), 1.0 / NUMDIMS);
                   else
                     {
-                      if(Right[target] == 0 && Left[target] == 0) {
-                        if(SphP[target].Hsml <= 0)
-                        {
-                            // Fix negative smoothing length instead of terminating
-                            printf("WARNING: Fixing negative smoothing length: (Hsml=%g)\n", 
-                                       SphP[target].Hsml);
-                            
-                            // Set to a small positive value
-                            SphP[target].Hsml = All.SofteningTable[0]; // Use gravitational softening as fallback
-                            
-                            // Continue the iteration with this fixed value
-                            Left[target] = 0.1 * SphP[target].Hsml;  // Set some reasonable bounds
-                            Right[target] = 10.0 * SphP[target].Hsml;
-                            continue;  // Skip to next particle
-                        }
-                        else
-                        {
-                            Terminate("Right[i] == 0 && Left[i] == 0  SphP[i].Hsml=%g", SphP[i].Hsml);
-                        }
+                      if(Right[i] == 0 && Left[i] == 0)
+                      {
+                          if(SphP[i].Hsml <= 0)
+                          {
+                              // Fix negative smoothing length instead of terminating
+                              mpi_printf("WARNING: Fixing negative smoothing length for particle ID=%llu (Hsml=%g)\n", 
+                                        (unsigned long long)P[i].ID.get(), SphP[i].Hsml);
+                              
+                              // Set to a small positive value
+                              SphP[i].Hsml = All.SofteningTable[0]; // Use gravitational softening as fallback
+                              
+                              // Skip to next particle
+                              continue;
+                          }
+                          else
+                          {
+                              Terminate("Right[i] == 0 && Left[i] == 0  SphP[i].Hsml=%g", SphP[i].Hsml);
+                          }
                       }
 
-                      if(Right[target] == 0 && Left[target] > 0)
-                        {
-                          if(Tp->P[target].getType() == 0 && fabs(SphP[target].NumNgb - desnumngb) < 0.5 * desnumngb)
-                            {
-                              double fac = 1 - (SphP[target].NumNgb - desnumngb) / (NUMDIMS * SphP[target].NumNgb) *
-                                                   SphP[target].DhsmlDensityFactor;
-
-                              if(fac < 1.26)
-                                SphP[target].Hsml *= fac;
-                              else
-                                SphP[target].Hsml *= 1.26;
-                            }
-                          else
-                            SphP[target].Hsml *= 1.26;
-                        }
+                      // Around line 460, modify the bisection algorithm to prevent degenerate bounds:
+                      if(Right[target] > 0 && Left[target] > 0)
+                      {
+                          // Check if bounds are too close (degenerate)
+                          if(fabs(Right[target] - Left[target]) < 1e-6 * Right[target])
+                          {
+                              // Bounds are too close, expand them slightly to avoid getting stuck
+                              Right[target] *= 1.1;
+                              Left[target] /= 1.1;
+                          }
+                          SphP[target].Hsml = pow(0.5 * (pow(Left[target], NUMDIMS) + pow(Right[target], NUMDIMS)), 1.0 / NUMDIMS);
+                      }
 
                       if(Right[target] > 0 && Left[target] == 0)
                         {
