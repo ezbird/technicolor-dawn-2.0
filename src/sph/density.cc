@@ -600,43 +600,24 @@ void sph::density(int *list, int ntarget)
                     SphP[target].Hsml = pow(0.5 * (pow(Left[target], NUMDIMS) + pow(Right[target], NUMDIMS)), 1.0 / NUMDIMS);
                   else
                     {
-                      if(Right[i] == 0 && Left[i] == 0)
-                      {
-                            if(SphP[i].Hsml <= 0 || SphP[i].Hsml > 10.0 * All.SofteningTable[0])  // Check for negative or extremely large values
-                            {
-                                // Fix problematic smoothing length instead of terminating
-                                printf("WARNING: Fixing problematic smoothing length (Hsml=%g)\n", 
-                                          SphP[i].Hsml);
-                                
-                                // Set to a reasonable value based on softening
-                                double reasonable_hsml = All.SofteningTable[0] * 2.0; // 2x the softening length
-                                SphP[i].Hsml = reasonable_hsml;
-                                
-                                // Initialize proper bounds
-                                Left[i] = reasonable_hsml * 0.5;
-                                Right[i] = reasonable_hsml * 2.0;
-                                
-                                // Skip to next particle
-                                continue;
-                            }
-                            else
-                            {
-                                Terminate("Right[i] == 0 && Left[i] == 0  SphP[i].Hsml=%g", SphP[i].Hsml);
-                            }
-                        }
+                      if(Right[target] == 0 && Left[target] == 0)
+                        Terminate("Right[i] == 0 && Left[i] == 0 SphP[i].Hsml=%g\n", SphP[target].Hsml);
 
-                      // Around line 460, modify the bisection algorithm to prevent degenerate bounds:
-                      if(Right[target] > 0 && Left[target] > 0)
-                      {
-                          // Check if bounds are too close (degenerate)
-                          if(fabs(Right[target] - Left[target]) < 1e-6 * Right[target])
-                          {
-                              // Bounds are too close, expand them slightly to avoid getting stuck
-                              Right[target] *= 1.1;
-                              Left[target] /= 1.1;
-                          }
-                          SphP[target].Hsml = pow(0.5 * (pow(Left[target], NUMDIMS) + pow(Right[target], NUMDIMS)), 1.0 / NUMDIMS);
-                      }
+                      if(Right[target] == 0 && Left[target] > 0)
+                        {
+                          if(Tp->P[target].getType() == 0 && fabs(SphP[target].NumNgb - desnumngb) < 0.5 * desnumngb)
+                            {
+                              double fac = 1 - (SphP[target].NumNgb - desnumngb) / (NUMDIMS * SphP[target].NumNgb) *
+                                                   SphP[target].DhsmlDensityFactor;
+
+                              if(fac < 1.26)
+                                SphP[target].Hsml *= fac;
+                              else
+                                SphP[target].Hsml *= 1.26;
+                            }
+                          else
+                            SphP[target].Hsml *= 1.26;
+                        }
 
                       if(Right[target] > 0 && Left[target] == 0)
                         {
