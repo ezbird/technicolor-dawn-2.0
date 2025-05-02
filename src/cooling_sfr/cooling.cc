@@ -679,145 +679,120 @@ void coolsfr::InitCool(void)
     IonizeParams();
 }
 
-
-
-void MakeCoolingTable(void)
+void coolsfr::MakeCoolingTable()
 {
-    int i;
-    double T, Tfact;
-    // Variables for the “new rates” fits
-    double dE, P, A, X, K, U, T_eV;
-    double b0, b1, b2, b3, b4, b5;
-    double c0, c1, c2, c3, c4, c5;
-    double y;
-    double E1s_2, Gamma1s_2s, Gamma1s_2p;
+    // — set primordial composition and constants —
+    GasState.XH      = HYDROGEN_MASSFRAC;
+    GasState.yhelium = (1.0 - GasState.XH) / (4.0 * GasState.XH);
+    GasState.mhboltz = PROTONMASS / BOLTZMANN;
 
-    // Primordial composition
-    XH      = 0.76;
-    yhelium = (1 - XH) / (4 * XH);
+    // — compute log-T spacing and minimum internal energy —
+    deltaT = (Tmax - Tmin) / double(NCOOLTAB);
+    GasState.ethmin = std::pow(10.0, Tmin)
+                    * (1.0 + GasState.yhelium)
+                    / ((1.0 + 4.0 * GasState.yhelium)
+                       * GasState.mhboltz
+                       * GAMMA_MINUS1);
 
-    // Convert proton mass to temperature units
-    mhboltz = PROTONMASS / BOLTZMANN;
-
-    // Floor for Tmin in log₁₀(K)
-    if (All.MinGasTemp > 0.0)
-        Tmin = log10(0.1 * All.MinGasTemp);
-    else
-        Tmin = 1.0;
-
-    // Log‐bin spacing
-    deltaT = (Tmax - Tmin) / NCOOLTAB;
-
-    // Minimum internal energy in cgs
-    ethmin = pow(10.0, Tmin) 
-           * (1. + yhelium) 
-           / ((1. + 4. * yhelium) * mhboltz * GAMMA_MINUS1);
-
-    // --- Fill the table ---
-    for (i = 0; i <= NCOOLTAB; i++)
+    // — fill the table —
+    for(int i = 0; i <= NCOOLTAB; i++)
     {
-        // Zero out all rates
-        BetaH0[i]    = 0.0;
-        BetaHep[i]   = 0.0;
-        Betaff[i]    = 0.0;
-        AlphaHp[i]   = 0.0;
-        AlphaHep[i]  = 0.0;
-        AlphaHepp[i] = 0.0;
-        Alphad[i]    = 0.0;
-        GammaeH0[i]  = 0.0;
-        GammaeHe0[i] = 0.0;
-        GammaeHep[i] = 0.0;
+        double logT = Tmin + deltaT * i;
+        double T    = std::pow(10.0, logT);
+        double tfac = 1.0 / (1.0 + std::sqrt(T / 1e5));
 
-        // Physical temperature for this bin
-        T     = pow(10.0, Tmin + deltaT * i);
-        Tfact = 1.0 / (1.0 + sqrt(T / 1.0e5));
-
-        // — H⁰ collisional ionization (Cen 92 fit) —
-        if (118348.0 / T < 70.0)
-            BetaH0[i] = 7.5e-19 * exp(-118348.0 / T) * Tfact;
-
-        // — Scholtz‐Walters ’91 additional high‐T correction —
-        if (T >= 2.0e3 && T < 1e8)
+        // H⁰ collisional ionization (Scholz–Walters ’91)
+        double betaH0;
+        if(T >= 2e3 && T < 1e8)
         {
-            if (T < 6.0e4)
+            double b0,b1,b2,b3,b4,b5;
+            double c0,c1,c2,c3,c4,c5;
+            if(T < 6e4)
             {
-                b0 = -3.299613e1;  b1 = 1.858848e1;  b2 = -6.052265;
-                b3 =  8.603783e-1; b4 = -5.717760e-2; b5 = 1.451330e-3;
-                c0 = -1.630155e2;  c1 = 8.795711e1;  c2 = -2.057117e1;
-                c3 =  2.359573e0;  c4 = -1.339059e-1; c5 = 3.021507e-3;
+                b0=-3.299613e1; b1=1.858848e1; b2=-6.052265;
+                b3=8.603783e-1; b4=-5.717760e-2; b5=1.451330e-3;
+                c0=-1.630155e2; c1=8.795711e1; c2=-2.057117e1;
+                c3=2.359573e0; c4=-1.339059e-1; c5=3.021507e-3;
             }
-            else if (T < 6.0e6)
+            else if(T < 6e6)
             {
-                b0 =  2.869759e2;  b1 = -1.077956e2;  b2 = 1.524107e1;
-                b3 = -1.080538e0;  b4 = 3.836975e-2;  b5 = -5.467273e-4;
-                c0 =  5.279996e2;  c1 = -1.939399e2;  c2 = 2.718982e1;
-                c3 = -1.883399e0;  c4 = 6.462462e-2;  c5 = -8.811076e-4;
+                b0=2.869759e2;  b1=-1.077956e2; b2=1.524107e1;
+                b3=-1.080538e0; b4=3.836975e-2; b5=-5.467273e-4;
+                c0=5.279996e2;  c1=-1.939399e2; c2=2.718982e1;
+                c3=-1.883399e0; c4=6.462462e-2; c5=-8.811076e-4;
             }
             else
             {
-                b0 = -2.7604708e3; b1 = 7.9339351e2;  b2 = -9.1198462e1;
-                b3 =  5.1993362e0; b4 = -1.4685343e-1; b5 = 1.6404093e-3;
-                c0 = -2.8133632e3; c1 = 8.1509685e2;  c2 = -9.4418414e1;
-                c3 =  5.4280565e0; c4 = -1.5467120e-1; c5 = 1.7439112e-3;
+                b0=-2.7604708e3; b1=7.9339351e2;  b2=-9.1198462e1;
+                b3=5.1993362e0;  b4=-1.4685343e-1; b5=1.6404093e-3;
+                c0=-2.8133632e3; c1=8.1509685e2;  c2=-9.4418414e1;
+                c3=5.4280565e0;  c4=-1.5467120e-1; c5=1.7439112e-3;
             }
-
-            // Combine the fits
-            y      = log(T);
-            E1s_2  = 10.2;  // eV
-            Gamma1s_2s = exp(b0 + b1*y + b2*y*y + b3*y*y*y + b4*y*y*y*y + b5*y*y*y*y*y);
-            Gamma1s_2p = exp(c0 + c1*y + c2*y*y + c3*y*y*y + c4*y*y*y*y + c5*y*y*y*y*y);
-            T_eV       = T / eV_to_K;
-            BetaH0[i]  = E1s_2 * eV_to_erg * (Gamma1s_2s + Gamma1s_2p) * exp(-E1s_2 / T_eV);
+            double y   = std::log(T);
+            double E2  = 10.2; // eV
+            double g2s = std::exp(b0 + b1*y + b2*y*y + b3*y*y*y + b4*y*y*y*y + b5*y*y*y*y*y);
+            double g2p = std::exp(c0 + c1*y + c2*y*y + c3*y*y*y + c4*y*y*y*y + c5*y*y*y*y*y);
+            double TeV = T / eV_to_K;
+            betaH0     = E2 * eV_to_erg * (g2s + g2p) * std::exp(-E2 / TeV);
+        }
+        else
+        {
+            betaH0 = (118348.0/T < 70.0)
+                   ? 7.5e-19 * std::exp(-118348.0/T) * tfac
+                   : 0.0;
         }
 
-        // — He⁺ collisional ionization —
-        if (473638.0 / T < 70.0)
-            BetaHep[i] = 5.54e-17 * pow(T, -0.397) * exp(-473638.0 / T) * Tfact;
+        // He⁺ collisional ionization
+        double betaHep = (473638.0/T < 70.0)
+                       ? 5.54e-17 * std::pow(T, -0.397) * std::exp(-473638.0/T) * tfac
+                       : 0.0;
 
-        // — Free‐free cooling —
-        Betaff[i] = 1.43e-27 * sqrt(T) 
-                  * (1.1 + 0.34 * exp(-((5.5 - log10(T))*(5.5 - log10(T)))/3.0));
+        // free–free cooling
+        double betaff = 1.43e-27 * std::sqrt(T)
+                      * (1.1 + 0.34 * std::exp(-std::pow(5.5 - std::log10(T),2)/3.0));
 
-        // — Radiative recombination H⁺→H⁰ —
-        AlphaHp[i] = 6.28e-11 
-                   * pow(T/1000.0, -0.2) 
-                   / (1.0 + pow(T/1.0e6, 0.7)) 
-                   / sqrt(T);
+        // radiative recombination
+        double alphaHp   = 6.28e-11
+                         * std::pow(T/1000.0, -0.2)
+                         / (1.0 + std::pow(T/1e6, 0.7))
+                         / std::sqrt(T);
+        double alphaHep  = 1.5e-10 * std::pow(T, -0.6353);
+        double alphaHepp = 3.36e-10
+                         * std::pow(T/1000.0, -0.2)
+                         / (1.0 + std::pow(T/4e6, 0.7))
+                         / std::sqrt(T);
 
-        // — Radiative recombination He⁺→He⁰ —
-        AlphaHep[i] = 1.5e-10 * pow(T, -0.6353);
+        // dielectronic recombination
+        double alphad = (470000.0/T < 70.0)
+                      ? 1.9e-3 * std::pow(T, -1.5) * std::exp(-470000.0/T)
+                        * (1.0 + 0.3 * std::exp(-94000.0/T))
+                      : 0.0;
 
-        // — Radiative recombination He²⁺→He⁺ —
-        AlphaHepp[i] = 3.36e-10 
-                     * pow(T/1000.0, -0.2) 
-                     / (1.0 + pow(T/4.0e6, 0.7)) 
-                     / sqrt(T);
+        // high-T collisional ionization (Voronov ’97)
+        double TeV = T / eV_to_K;
+        double U;
 
-        // — Dielectronic recombination —
-        if (470000.0 / T < 70.0)
-            Alphad[i] = 1.9e-3 
-                      * pow(T, -1.5) 
-                      * exp(-470000.0 / T) 
-                      * (1.0 + 0.3 * exp(-94000.0 / T));
+        U = 13.6/TeV;
+        double geH0  = 0.291e-7 * std::pow(U, 0.39) * std::exp(-U) / (0.232 + U);
+        U = 24.6/TeV;
+        double geHe0 = 0.175e-7 * std::pow(U, 0.35) * std::exp(-U) / (0.18 + U);
+        U = 54.4/TeV;
+        double geHep = 0.205e-8 * (1.0 + std::sqrt(U)) * std::pow(U, 0.25)
+                      * std::exp(-U) / (0.265 + U);
 
-        // — Collisional ionization (Voronov ’97) for e⁻ + H, He, He⁺ —
-        T_eV = T / eV_to_K;
-
-        // H⁰
-        dE = 13.6;  P = 0.0;  A = 0.291e-7;  X = 0.232;  K = 0.39;  U = dE/T_eV;
-        GammaeH0[i] = A * (1.0 + P*sqrt(U)) * pow(U, K) * exp(-U) / (X + U);
-
-        // He⁰
-        dE = 24.6;  P = 0.0;  A = 0.175e-7;  X = 0.18;   K = 0.35;  U = dE/T_eV;
-        GammaeHe0[i] = A * (1.0 + P*sqrt(U)) * pow(U, K) * exp(-U) / (X + U);
-
-        // He⁺
-        dE = 54.4;  P = 1.0;  A = 0.205e-8;  X = 0.265;  K = 0.25;  U = dE/T_eV;
-        GammaeHep[i] = A * (1.0 + P*sqrt(U)) * pow(U, K) * exp(-U) / (X + U);
+        // store into the table
+        RateT[i].BetaH0    = betaH0;
+        RateT[i].BetaHep   = betaHep;
+        RateT[i].Betaff    = betaff;
+        RateT[i].AlphaHp   = alphaHp;
+        RateT[i].AlphaHep  = alphaHep;
+        RateT[i].Alphad    = alphad;
+        RateT[i].AlphaHepp = alphaHepp;
+        RateT[i].GammaeH0  = geH0;
+        RateT[i].GammaeHe0 = geHe0;
+        RateT[i].GammaeHep = geHep;
     }
 }
-
-
 
 
 /** \brief Apply the isochoric cooling to all the active gas particles.
