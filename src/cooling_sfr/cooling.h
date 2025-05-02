@@ -29,25 +29,33 @@
    void InitCool(void);
    void IonizeParams(void);
  
-   /**\n   * @brief Allocate and initialize the TREECOOL rate table
+   /**
+    * @brief Allocate and initialize the TREECOOL rate table
     */
    void InitCoolMemory();
  
-   /**\n   * @brief Populate the TREECOOL rate table (wrapper to global MakeCoolingTable())
+   /**
+    * @brief Populate the TREECOOL rate table (wrapper to global MakeCoolingTable())
     */
    void MakeCoolingTable();
  
    void cooling_only(simparticles *Sp);
  
  #ifdef STARFORMATION
-   void sfr_create_star_particles(simparticles *Sp);
    void set_units_sfr(void);
    void cooling_and_starformation(simparticles *Sp);
    void init_clouds(void);
+   void init_star_formation_log(void);
+   void close_star_formation_log(void);
+   void integrate_sfr(void);
+   void rearrange_particle_sequence(simparticles *Sp);
  #endif
  
   private:
  #define NCOOLTAB 2000
+ #ifdef STARFORMATION
+ #define GENERATIONS 4  /* Number of stars a gas particle may form */
+ #endif
  
    /* data for gas state */
    struct gas_state
@@ -105,34 +113,40 @@
  #ifdef COOLING
    /* Core cooling routines */
    double DoCooling(double u_old, double rho, double dt, double *ne_guess,
-                    gas_state *gs, const do_cool_data *DoCool);
+                   gas_state *gs, const do_cool_data *DoCool);
    double GetCoolingTime(double u_old, double rho, double *ne_guess,
-                         gas_state *gs, const do_cool_data *DoCool);
+                        gas_state *gs, const do_cool_data *DoCool);
    void cool_sph_particle(simparticles *Sp, int i,
-                          gas_state *gs, const do_cool_data *DoCool);
+                         gas_state *gs, const do_cool_data *DoCool);
  
    void SetZeroIonization(void);
  #endif
  
-   void integrate_sfr(void);
+ #ifdef STARFORMATION
+   /* Star formation specific functions */
+   double get_starformation_rate(int i, double *xcloud, simparticles *Sp);
+   void create_star_particle(simparticles *Sp, int i, double prob, double rnd);
+   double get_random_number(int id);
+   void spawn_wind_particle(simparticles *Sp, int i, double cloudmass, double tsfr);
+   
+   FILE *FdSfr;   /**< File handle for star formation log */
+ #endif
  
    /* Conversion and rate-finder routines */
    double CoolingRate(double logT, double rho, double *nelec,
-                      gas_state *gs, const do_cool_data *DoCool);
+                     gas_state *gs, const do_cool_data *DoCool);
    double CoolingRateFromU(double u, double rho, double *ne_guess,
-                           gas_state *gs, const do_cool_data *DoCool);
+                          gas_state *gs, const do_cool_data *DoCool);
    void find_abundances_and_rates(double logT, double rho,
-                                  double *ne_guess, gas_state *gs,
-                                  const do_cool_data *DoCool);
+                                 double *ne_guess, gas_state *gs,
+                                 const do_cool_data *DoCool);
    void IonizeParamsUVB(void);
    void ReadIonizeParams(char *fname);
- 
-   /* Default G4 analytic table builder (guarded out by TABLECOOL) */
- //#ifndef TABLECOOL
- //  void MakeRateTable(void);
- //#endif
+   
+   double convert_u_to_temp(double u, double rho, double *ne_guess, 
+                           gas_state *gs, const do_cool_data *DoCool);
+   void MakeRateTable(void);
  };
  
  #endif /* COOLING */
  #endif /* COOLING_H */
- 

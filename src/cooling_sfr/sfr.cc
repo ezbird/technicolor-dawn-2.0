@@ -4,6 +4,8 @@
  *  Combined star formation and cooling integration for Gadget-4
  ******************************************************************************/
 
+ #include "gadgetconfig.h"
+
 #include "allvars.h"
 #include "proto.h"
 #include "cosmology.h"

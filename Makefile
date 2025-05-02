@@ -313,7 +313,7 @@ endif
 
 
 ifeq (COOLING,$(findstring COOLING,$(CONFIGVARS)))
-OBJS    += cooling_sfr/cooling.o cooling_sfr/feedback_treewalk.o cooling_sfr/sfr.o cooling_sfr/sfr_modern.o
+OBJS    += cooling_sfr/cooling.o cooling_sfr/feedback_treewalk.o cooling_sfr/coolsfr_impl.o cooling_sfr/starformation.o
 INCL    += cooling_sfr/cooling.h
 SUBDIRS += cooling_sfr
 endif
