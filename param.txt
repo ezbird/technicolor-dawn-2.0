@@ -102,6 +102,7 @@ MinEgySpec                   0.05       ; Minimum temperature of roughly 400K
 MinGasTemp                   50
 InitGasTemp                  462.77046  ; in Kelvin, Sets the initial gas temperature, if not provided in the ICs.
 ViscosityAlphaMin            0.2        ; minimum viscosity coefficient 
+MinGasHsml                   1.0e-4     ; we can get negative smoothing lengths without this
 
 %----- Star formation
 StarformationMode     1

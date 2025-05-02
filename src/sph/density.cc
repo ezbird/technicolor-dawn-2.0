@@ -598,6 +598,16 @@ void sph::density(int *list, int ntarget)
 
                   if(Right[target] > 0 && Left[target] > 0)
                     SphP[target].Hsml = pow(0.5 * (pow(Left[target], NUMDIMS) + pow(Right[target], NUMDIMS)), 1.0 / NUMDIMS);
+
+
+                    /* Enforce minimum smoothing length if configured */
+                    if(All.MinGasHsml > 0 && SphP[target].Hsml < All.MinGasHsml)
+                    {
+                        printf("Clamping Hsml for target=%d from %g to MinGasHsml=%g\n", target, SphP[target].Hsml, All.MinGasHsml);
+                        SphP[target].Hsml = All.MinGasHsml;
+                    }
+
+
                   else
                     {
                       if(Right[target] == 0 && Left[target] == 0)

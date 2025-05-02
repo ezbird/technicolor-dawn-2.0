@@ -145,7 +145,7 @@ struct global_data_all_processes : public parameters
   double HubbleParam; /**< little `h', i.e. can be used to scale unit system to absorb uncertain value of Hubble constant.  Only needed
                        * to get absolute physical values for cooling physics
                        */
-
+  double MinGasHsml;
   double BoxSize; /**< Boxsize in case periodic boundary conditions are used */
 
   /* Code options */
