@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "../cooling_sfr/starformation.h"
 #include "../cooling_sfr/cooling.h"
 #include "../data/allvars.h"
 #include "../data/dtypes.h"
@@ -239,7 +240,7 @@ void sim::begrun1(const char *parameterFile)
 
 #ifdef STARFORMATION
   //CoolSfr.init_clouds();
-  init_starformation();  // This will set up units, initialize star formation log, and call init_clouds()
+  this->init_starformation();  // This will set up units, initialize star formation log, and call init_clouds()
 #endif
 
 #if((!defined(PMGRID) || (defined(PMGRID) && defined(TREEPM_NOTIMESPLIT))) && defined(SELFGRAVITY) && defined(PERIODIC)) || \
