@@ -9,170 +9,130 @@
  *  \brief defines a class for dealing with cooling and star formation
  */
 
-#ifndef COOLING_H
-#define COOLING_H
-
-#include "gadgetconfig.h"
-
-#ifdef COOLING
-
-#include "../data/simparticles.h"
-#include "../mpi_utils/setcomm.h"
-
-class coolsfr : public setcomm
-{
- public:
-  coolsfr(MPI_Comm comm) : setcomm(comm) {}
-
-  double AbundanceRatios(double u, double rho, double *ne_guess, double *nH0_pointer, double *nHeII_pointer);
-
-  void InitCool();
-  void ReadIonizeParams(const char *fname);
-  void MakeCoolingTable();
-  void IonizeParams();
-  void IonizeParamsTable();
-  void InitCoolMemory();
-  void cooling_only(simparticles *Sp);
-
-#ifdef STARFORMATION
-  //void sfr_create_star_particles(simparticles *Sp);
-
-  double getZ(simparticles *Sp, int i);
-  void init_clouds(void);
-  void set_units_sfr(void);
-  bool sf_evaluate_particle(simparticles *Sp, int i);
-  double get_starformation_rate(simparticles *Sp, int i, double *cloudMassFraction);
-  void update_thermodynamic_state(simparticles *Sp, int i, double dt, double cloudMassFraction);
-  void cooling_and_starformation(simparticles *Sp);
-  void debug_energy_temp_conversion(void);
-  
-
-
-  #ifdef WINDS
-    void winds_effective_model(simparticles *Sp, int i, double dt, double sfr, double cloudMassFraction);
-  #endif
-
-#endif
-
- private:
-
-   static const int SFR_COOLING_MAXITER = 1000;
-   static const int NCOOLTAB = 2000;
-   static constexpr double Tmin = 1.0;  /** min temperature in log10 */
-   static constexpr double Tmax = 9.0;  /** max temperature in log10 */
-
-
-#define NCOOLTAB 2000
-
-  /* data for gas state */
-  struct gas_state
-  {
-    double ne, necgs, nHcgs;
-    double bH0, bHep, bff, aHp, aHep, aHepp, ad, geH0, geHe0, geHep;
-    double gJH0ne, gJHe0ne, gJHepne;
-    double nH0, nHp, nHep, nHe0, nHepp;
-    double XH, yhelium;
-    double mhboltz;
-    double ethmin; /* minimum internal energy for neutral gas */
-  };
-
-  /* tabulated rates */
-  struct rate_table
-  {
-    double BetaH0, BetaHep, Betaff;
-    double AlphaHp, AlphaHep, Alphad, AlphaHepp;
-    double GammaeH0, GammaeHe0, GammaeHep;
-  };
-
-  /* photo-ionization/heating rate table */
-  struct photo_table
-  {
-    float variable;       /* logz for UVB */
-    float gH0, gHe, gHep; /* photo-ionization rates */
-    float eH0, eHe, eHep; /* photo-heating rates */
-  };
-
-  /* current interpolated photo-ionization/heating rates */
-  struct photo_current
-  {
-    char J_UV;
-    double gJH0, gJHep, gJHe0, epsH0, epsHep, epsHe0;
-  };
-
-  /* cooling data */
-  struct do_cool_data
-  {
-    double u_old_input, rho_input, dt_input, ne_guess_input;
-  };
-
-  gas_state GasState;      /**< gas state */
-  do_cool_data DoCoolData; /**< cooling data */
-
-  rate_table *RateT;      /**< tabulated rates */
-  photo_table *PhotoTUVB; /**< photo-ionization/heating rate table for UV background*/
-  photo_current pc;       /**< current interpolated photo rates */
-
-  double deltaT;     /**< log10 of temperature spacing in the interpolation tables */
-  int NheattabUVB;   /**< length of UVB photo table */
-
-#ifdef COOLING
-  double DoCooling(double u_old, double rho, double dt, double *ne_guess, gas_state *gs, do_cool_data *DoCool);
-  double GetCoolingTime(double u_old, double rho, double *ne_guess, gas_state *gs, do_cool_data *DoCool);
-  void cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_data *DoCool);
-
-  void SetZeroIonization(void);
-#endif
-
-  void integrate_sfr(void);
-
-  double CoolingRate(double logT, double rho, double *nelec, gas_state *gs, const do_cool_data *DoCool);
-  double CoolingRateFromU(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool);
-  void find_abundances_and_rates(double logT, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool);
-  void IonizeParamsUVB(void);
-  void ReadIonizeParams(char *fname);
-
-  double convert_u_to_temp(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool);
-
-  void MakeRateTable(void);
-
-#ifdef DUST
-  void make_dust(simparticles *Sp, int i, double prob, MyDouble mass_of_star, double *sum_mass_stars);
-  void spawn_dust_from_sph_particle(simparticles *Sp, int igas, double birthtime, int idust, MyDouble mass_of_dust);
-  void convert_sph_particle_into_dust(simparticles *Sp, int i, double birthtime);
-  int dust_spawned;           /**< local number of star particles spawned in the time step */
-  int tot_dust_spawned;       /**< global number of star paricles spawned in the time step */
-  int dust_converted;         /**< local number of gas cells converted into stars in the time step */
-  int tot_dust_converted;     /**< global number of gas cells converted into stars in the time step */
-#endif
-
-/* void inject_supernova_feedback(simparticles *Sp, int i); */
-
-#ifdef SUPERNOVA
-  /*
-  void handle_supernovae(simparticles *Sp);
-  
-  void spawn_dust_from_supernova(simparticles *Sp, int i);
-   double compute_distance(const double pos1[3], const double pos2[3], double box_size);
-*/
-#endif
-
-#ifdef STARFORMATION
-  const int WriteMiscFiles = 1;
-
-  void make_star(simparticles *Sp, int i, double prob, MyDouble mass_of_star, double *sum_mass_stars);
-  void spawn_star_from_sph_particle(simparticles *Sp, int igas, double birthtime, int istar, MyDouble mass_of_star);
-  void convert_sph_particle_into_star(simparticles *Sp, int i, double birthtime);
-  
-  int stars_spawned;           /**< local number of star particles spawned in the time step */
-  int tot_stars_spawned;       /**< global number of star paricles spawned in the time step */
-  int stars_converted;         /**< local number of gas cells converted into stars in the time step */
-  int tot_stars_converted;     /**< global number of gas cells converted into stars in the time step */
-
-  int altogether_spawned;      /**< local number of star+wind particles spawned in the time step */
-  int tot_altogether_spawned;  /**< global number of star+wind particles spawned in the time step */
-  double cum_mass_stars = 0.0; /**< cumulative mass of stars created in the time step (global value) */
-#endif
-};
-
-#endif
-#endif
+ #ifndef COOLING_H
+ #define COOLING_H
+ 
+ #include "gadgetconfig.h"
+ 
+ #ifdef COOLING
+ 
+ #include "../data/simparticles.h"
+ #include "../mpi_utils/setcomm.h"
+ 
+ class coolsfr : public setcomm
+ {
+  public:
+   coolsfr(MPI_Comm comm) : setcomm(comm) {}
+ 
+   double AbundanceRatios(double u, double rho, double *ne_guess, double *nH0_pointer, double *nHeII_pointer);
+ 
+   void InitCool(void);
+   void IonizeParams(void);
+ 
+   /**\n   * @brief Allocate and initialize the TREECOOL rate table
+    */
+   void InitCoolMemory();
+ 
+   /**\n   * @brief Populate the TREECOOL rate table (wrapper to global MakeCoolingTable())
+    */
+   void MakeCoolingTable();
+ 
+   void cooling_only(simparticles *Sp);
+ 
+ #ifdef STARFORMATION
+   void sfr_create_star_particles(simparticles *Sp);
+   void set_units_sfr(void);
+   void cooling_and_starformation(simparticles *Sp);
+   void init_clouds(void);
+ #endif
+ 
+  private:
+ #define NCOOLTAB 2000
+ 
+   /* data for gas state */
+   struct gas_state
+   {
+     double ne, necgs, nHcgs;
+     double bH0, bHep, bff, aHp, aHep, aHepp, ad, geH0, geHe0, geHep;
+     double gJH0ne, gJHe0ne, gJHepne;
+     double nH0, nHp, nHep, nHe0, nHepp;
+     double XH, yhelium;
+     double mhboltz;
+     double ethmin; /* minimum internal energy for neutral gas */
+   };
+ 
+   /* tabulated rates */
+   struct rate_table
+   {
+     double BetaH0, BetaHep, Betaff;
+     double AlphaHp, AlphaHep, Alphad, AlphaHepp;
+     double GammaeH0, GammaeHe0, GammaeHep;
+   };
+ 
+   /* photo-ionization/heating rate table */
+   struct photo_table
+   {
+     float variable;       /* logz for UVB */
+     float gH0, gHe, gHep; /* photo-ionization rates */
+     float eH0, eHe, eHep; /* photo-heating rates */
+   };
+ 
+   /* current interpolated photo-ionization/heating rates */
+   struct photo_current
+   {
+     char J_UV;
+     double gJH0, gJHep, gJHe0, epsH0, epsHep, epsHe0;
+   };
+ 
+   /* cooling data */
+   struct do_cool_data
+   {
+     double u_old_input, rho_input, dt_input, ne_guess_input;
+   };
+ 
+   gas_state GasState;      /**< gas state */
+   do_cool_data DoCoolData; /**< cooling data */
+ 
+   rate_table *RateT;      /**< TREECOOL tabulated rates */
+   photo_table *PhotoTUVB; /**< photo-ionization/heating rate table for UV background */
+   photo_current pc;       /**< current interpolated photo rates */
+ 
+   double Tmin = 1.0; /**< min temperature in log10 */
+   double Tmax = 9.0; /**< max temperature in log10 */
+   double deltaT;     /**< log10 of temperature spacing in the interpolation tables */
+   int NheattabUVB;   /**< length of UVB photo table */
+ 
+ #ifdef COOLING
+   /* Core cooling routines */
+   double DoCooling(double u_old, double rho, double dt, double *ne_guess,
+                    gas_state *gs, const do_cool_data *DoCool);
+   double GetCoolingTime(double u_old, double rho, double *ne_guess,
+                         gas_state *gs, const do_cool_data *DoCool);
+   void cool_sph_particle(simparticles *Sp, int i,
+                          gas_state *gs, const do_cool_data *DoCool);
+ 
+   void SetZeroIonization(void);
+ #endif
+ 
+   void integrate_sfr(void);
+ 
+   /* Conversion and rate-finder routines */
+   double CoolingRate(double logT, double rho, double *nelec,
+                      gas_state *gs, const do_cool_data *DoCool);
+   double CoolingRateFromU(double u, double rho, double *ne_guess,
+                           gas_state *gs, const do_cool_data *DoCool);
+   void find_abundances_and_rates(double logT, double rho,
+                                  double *ne_guess, gas_state *gs,
+                                  const do_cool_data *DoCool);
+   void IonizeParamsUVB(void);
+   void ReadIonizeParams(char *fname);
+ 
+   /* Default G4 analytic table builder (guarded out by TABLECOOL) */
+ #ifndef TABLECOOL
+   void MakeRateTable(void);
+ #endif
+ };
+ 
+ #endif /* COOLING */
+ #endif /* COOLING_H */
+ 
