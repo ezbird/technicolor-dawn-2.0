@@ -340,11 +340,6 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
 
 double coolsfr::convert_u_to_temp(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
 {
-    // Safety check
-    if(u <= 0) {
-        return 10.0;  // Minimum temperature
-    }
-    
     // Calculate mean molecular weight
     double mu;
     if(*ne_guess > 0) {
@@ -353,17 +348,13 @@ double coolsfr::convert_u_to_temp(double u, double rho, double *ne_guess, gas_st
         mu = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);
     }
     
-    // Convert to physical units first
+    // Convert internal energy to physical units
     double u_phys = u * All.UnitMass_in_g / All.UnitEnergy_in_cgs;
     
-    // Calculate temperature
+    // Calculate temperature in Kelvin
     double temp = u_phys * GAMMA_MINUS1 * PROTONMASS * mu / BOLTZMANN;
     
-    // Safety check for physical temperatures
-    if(temp < 10.0 || !gsl_finite(temp)) {
-        return 10.0;
-    }
-    
+    // Return the actual calculated temperature without applying a floor
     return temp;
 }
 
@@ -683,28 +674,30 @@ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_
     double rho = Sp->SphP[i].Density;
     double u_old = Sp->get_utherm_from_entropy(i);
     
-    // Calculate temperature before cooling
-    double temp_old = convert_u_to_temp(u_old, rho, &ne, gs, DoCool);
-    
     // Apply cooling
     double unew = DoCooling(u_old, rho, dt, &ne, gs, DoCool);
     
-    // Temperature after cooling
-    double temp_after_cooling = convert_u_to_temp(unew, rho, &ne, gs, DoCool);
+    // Get temperature after cooling
+    double temp_new = convert_u_to_temp(unew, rho, &ne, gs, DoCool);
     
-    // Check if cooling is overpowering adiabatic heating
-    if(ThisTask == 0 && i % 1000 == 0) {
-        mpi_printf("COOLING_BALANCE: Part %d rho=%g T_old=%g T_cooled=%g cooling_change=%g%%\n",
-                  Sp->P[i].ID.get(), rho, temp_old, temp_after_cooling, 
-                  100.0 * (temp_after_cooling - temp_old) / temp_old);
-    }
+    // Density-dependent temperature floor: T_min ∝ ρ^(γ-1)
+    double rho_physical = rho * All.cf_a3inv;
+    double rho_ref = 1e-30;  // Reference density in g/cm³
+    double temp_ref = 10.0;  // Temperature floor at reference density
     
-    // Apply temperature floor directly
-    double temp_min = 50.0; // Your desired minimum temperature
-    if(temp_after_cooling < temp_min) {
+    // Calculate minimum temperature based on adiabatic relation
+    double temp_min = temp_ref * pow(rho_physical / rho_ref, GAMMA_MINUS1);
+    
+    // Apply the density-dependent floor
+    if(temp_new < temp_min) {
         double mean_weight = 4.0 / (1.0 + 3.0 * HYDROGEN_MASSFRAC);
         unew = BOLTZMANN * temp_min / (mean_weight * PROTONMASS * GAMMA_MINUS1);
         unew /= (All.UnitVelocity_in_cm_per_s * All.UnitVelocity_in_cm_per_s);
+        
+        if(ThisTask == 0 && i % 1000 == 0) {
+            mpi_printf("FLOOR_APPLIED: Part %d rho=%g T_after_cooling=%g T_floor=%g\n",
+                      Sp->P[i].ID.get(), rho_physical, temp_new, temp_min);
+        }
     }
     
     // Update particle properties
