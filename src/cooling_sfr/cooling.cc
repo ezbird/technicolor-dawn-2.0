@@ -35,8 +35,10 @@
 // ----------------------------------------------------------------------
 void coolsfr::InitCoolMemory()
 {
-    // RateT is declared in cooling.h as `rate_table *RateT;`
-    RateT = (rate_table *) mymalloc((size_t)(NCOOLTAB + 1) * sizeof(rate_table));
+    // Allocate one contiguous array of rate_table structs
+    RateT = (rate_table *) 
+              mymalloc(RateT,
+                       (size_t)(NCOOLTAB + 1) * sizeof(rate_table));
 }
 
 /** \brief Compute the new internal energy per unit mass.
