@@ -601,18 +601,18 @@ void sph::density(int *list, int ntarget)
                   else
                     {
                       if(Right[target] == 0 && Left[target] == 0) {
-                        if(SphP[i].Hsml <= 0)
+                        if(SphP[target].Hsml <= 0)
                         {
                             // Fix negative smoothing length instead of terminating
                             mpi_printf("WARNING: Fixing negative smoothing length for particle ID=%lld (Hsml=%g)\n", 
-                                       (long long)P[i].ID.get(), SphP[i].Hsml);
+                                       (long long)P[target].ID.get(), SphP[target].Hsml);
                             
                             // Set to a small positive value
-                            SphP[i].Hsml = All.SofteningTable[0]; // Use gravitational softening as fallback
+                            SphP[target].Hsml = All.SofteningTable[0]; // Use gravitational softening as fallback
                             
                             // Continue the iteration with this fixed value
-                            Left[i] = 0.1 * SphP[i].Hsml;  // Set some reasonable bounds
-                            Right[i] = 10.0 * SphP[i].Hsml;
+                            Left[target] = 0.1 * SphP[target].Hsml;  // Set some reasonable bounds
+                            Right[target] = 10.0 * SphP[target].Hsml;
                             continue;  // Skip to next particle
                         }
                         else
