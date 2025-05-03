@@ -38,7 +38,7 @@
  {
    TIMER_START(CPU_MISC);
  
-   mpi_printf("STARFORMATION: Initializing star formation module...\n");
+   printf("STARFORMATION: Initializing star formation module...\n");
    
    /* Initialize the star formation log file */
    if(ThisTask == 0)
@@ -69,7 +69,7 @@
  {
    TIMER_START(CPU_MISC);
  
-   mpi_printf("STARFORMATION: Ending star formation module...\n");
+   printf("STARFORMATION: Ending star formation module...\n");
  
    TIMER_STOP(CPU_MISC);
  }
