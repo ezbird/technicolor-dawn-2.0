@@ -28,6 +28,8 @@
  #include "../logs/timer.h"
  #include "../system/system.h"
  
+ extern coolsfr CoolSfr;  // This declares that CoolSfr is defined elsewhere
+ 
  /*! \brief Initialize star formation module
   *
   *  This function initializes the star formation module.
