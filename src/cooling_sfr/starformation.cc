@@ -29,7 +29,7 @@
  #include "../system/system.h"
  
  extern coolsfr CoolSfr;  // This declares that CoolSfr is defined elsewhere
- 
+
  /*! \brief Initialize star formation module
   *
   *  This function initializes the star formation module.
@@ -57,7 +57,7 @@
      }
    
    /* Initialize the multi-phase model for star formation */
-   CoolSfr->init_clouds();
+   CoolSfr.init_clouds();
  
    TIMER_STOP(CPU_MISC);
  }
