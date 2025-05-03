@@ -383,6 +383,17 @@ double coolsfr::get_starformation_rate(int i, double *xcloud, simparticles *Sp)
  */
 void coolsfr::create_star_particle(simparticles *Sp, int i, double prob, double rnd)
 {
+
+    if(ThisTask == 0)
+    {
+      static int prob_checks = 0;
+      if(prob_checks < 5)
+      {
+        printf("STARFORMATION: prob=%g, rnd=%g, ID=%llu\n", prob, rnd, Sp->P[i].ID.get());
+        prob_checks++;
+      }
+    }
+
   if(rnd < prob)  /* Make a star */
     {
       if(Sp->P[i].getMass() < 1.5 * All.TargetGasMass / GENERATIONS)
@@ -604,6 +615,19 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
  */
 double coolsfr::get_random_number(int id)
 {
+
+  // Test the random number output
+  if(ThisTask == 0)
+  {
+    static int rnd_checks = 0;
+    if(rnd_checks < 5)
+    {
+      double test_rnd = get_random_number(id); // Call the original function
+      printf("STARFORMATION: id=%d, rnd=%g\n", id, test_rnd);
+      rnd_checks++;
+    }
+  }
+
   // Implementation adapted from Gadget's random number generator
   double dum;
   
