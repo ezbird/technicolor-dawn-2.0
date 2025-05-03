@@ -435,7 +435,8 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
   
   double time_h_a = (All.ComovingIntegrationOn) ? All.Time * All.cf_hubble_a : 1.0;
   double total_sfr = 0;  // Total star formation rate
-  
+  int sf_eligible = 0;
+
   gas_state gs = GasState;
   do_cool_data DoCool = DoCoolData;
   
@@ -463,6 +464,7 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
             {
               if(rho >= All.PhysDensThresh)
                 Sp->SphP[target].SfFlag = 1;
+                sf_eligible++;
             }
             
           // Additional cosmological threshold check
@@ -501,6 +503,18 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
               
               total_sfr += sfr;
               
+                // DEBUGGING!
+                if(ThisTask == 0)
+                {
+                    static int printed = 0;
+                    if(printed < 5)
+                    {
+                    mpi_printf("STARFORMATION: particle %d, rho=%g, thresh=%g, xcloud=%g, sfr=%g\n", 
+                                target, Sp->SphP[target].Density * All.cf_a3inv, All.PhysDensThresh, xcloud, sfr);
+                    printed++;
+                    }
+                }
+
               // Calculate star formation probability
               double tsfr, factorEVP, egyhot, egyeff, egyold, egycurrent;
               double ne = Sp->SphP[target].Ne;
@@ -575,6 +589,9 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
         }
     }
   
+  if(ThisTask == 0)
+      mpi_printf("STARFORMATION: %d particles eligible for star formation\n", sf_eligible);
+
   // Output total star formation rate
   double glob_totsfr;
   MPI_Allreduce(&total_sfr, &glob_totsfr, 1, MPI_DOUBLE, MPI_SUM, Communicator);

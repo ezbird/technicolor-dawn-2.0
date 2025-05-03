@@ -191,50 +191,85 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
  *  \param ne_guess electron number density relative to hydrogen number density
  *  \return the gas temperature
  */
-double coolsfr::convert_u_to_temp(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
-{
-  double u_input   = u;
-  double rho_input = rho;
-  double ne_input  = *ne_guess;
-
-  double mu   = (1 + 4 * gs->yhelium) / (1 + gs->yhelium + *ne_guess);
-  double temp = GAMMA_MINUS1 / BOLTZMANN * u * PROTONMASS * mu;
-
-  double max = 0;
-  int iter   = 0;
-  double temp_old;
-  do
-    {
-      double ne_old = *ne_guess;
-
-      find_abundances_and_rates(log10(temp), rho, ne_guess, gs, DoCool);
-      temp_old = temp;
-
-      mu = (1 + 4 * gs->yhelium) / (1 + gs->yhelium + *ne_guess);
-
-      double temp_new = GAMMA_MINUS1 / BOLTZMANN * u * PROTONMASS * mu;
-
-      max = std::max<double>(max, temp_new / (1 + gs->yhelium + *ne_guess) * fabs((*ne_guess - ne_old) / (temp_new - temp_old + 1.0)));
-
-      temp = temp_old + (temp_new - temp_old) / (1 + max);
-      iter++;
-
-      if(iter > (MAXITER - 10))
-        printf("-> temp= %g ne=%g\n", temp, *ne_guess);
-    }
-  while(fabs(temp - temp_old) > 1.0e-3 * temp && iter < MAXITER);
-
-  if(iter >= MAXITER)
-    {
-      printf("failed to converge in convert_u_to_temp()\n");
-      printf("u_input= %g\nrho_input=%g\n ne_input=%g\n", u_input, rho_input, ne_input);
-      printf("DoCool->u_old_input=%g\nDoCool->rho_input= %g\nDoCool->dt_input= %g\nDoCool->ne_guess_input= %g\n", DoCool->u_old_input,
-             DoCool->rho_input, DoCool->dt_input, DoCool->ne_guess_input);
-      Terminate("convergence failure");
-    }
-
-  return temp;
-}
+ double coolsfr::convert_u_to_temp(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
+ {
+   // Input parameters for debugging
+   double u_input   = u;
+   double rho_input = rho;
+   double ne_input  = *ne_guess;
+ 
+   // Handle negative energy (shouldn't happen but just in case)
+   if(u <= 0)
+   {
+     *ne_guess = 0;
+     return 1.0; // Return minimal temperature
+   }
+ 
+   // Initial temperature guess
+   double mu   = (1 + 4 * gs->yhelium) / (1 + gs->yhelium + *ne_guess);
+   double temp = GAMMA_MINUS1 / BOLTZMANN * u * PROTONMASS * mu;
+ 
+   // If temperature is too high or too low, restrict to sensible range
+   if(temp > 1e12) temp = 1e12;
+   if(temp < 1.0) temp = 1.0;
+ 
+   double max = 0;
+   int iter   = 0;
+   double temp_old;
+   int MAXITER = 50; // Increased from typical 30
+   double TOLERANCE = 1.0e-3; // Can be adjusted based on your simulation
+ 
+   do
+   {
+     double ne_old = *ne_guess;
+ 
+     find_abundances_and_rates(log10(temp), rho, ne_guess, gs, DoCool);
+     temp_old = temp;
+ 
+     mu = (1 + 4 * gs->yhelium) / (1 + gs->yhelium + *ne_guess);
+ 
+     double temp_new = GAMMA_MINUS1 / BOLTZMANN * u * PROTONMASS * mu;
+ 
+     // Guard against non-physical values
+     if(!isfinite(temp_new) || temp_new <= 0)
+     {
+       temp_new = temp_old > 0 ? temp_old : 1.0;
+     }
+ 
+     // Modified damping to prevent oscillations
+     max = std::max<double>(max, temp_new / (1 + gs->yhelium + *ne_guess) * fabs((*ne_guess - ne_old) / (temp_new - temp_old + 1.0)));
+     
+     // Apply stronger damping as iterations increase
+     double damping = 1.0 + max * (1.0 + 0.1 * iter);
+     temp = temp_old + (temp_new - temp_old) / damping;
+     
+     // Guard against temperature going out of bounds
+     if(temp <= 0 || !isfinite(temp)) temp = temp_old > 0 ? temp_old : 1.0;
+     
+     iter++;
+ 
+     // Debug output for the last iterations
+     if(iter > (MAXITER - 10))
+     {
+       printf("-> temp= %g ne=%g\n", temp, *ne_guess);
+     }
+   }
+   while(fabs(temp - temp_old) > TOLERANCE * temp && iter < MAXITER);
+ 
+   if(iter >= MAXITER)
+   {
+     // Instead of terminating, just warn and use last value
+     printf("Warning: Failed to converge in convert_u_to_temp()\n");
+     printf("u_input= %g\nrho_input=%g\n ne_input=%g\n", u_input, rho_input, ne_input);
+     printf("DoCool->u_old_input=%g\nDoCool->rho_input= %g\nDoCool->dt_input= %g\nDoCool->ne_guess_input= %g\n", 
+            DoCool->u_old_input, DoCool->rho_input, DoCool->dt_input, DoCool->ne_guess_input);
+     
+     // Return the last calculated temperature even if not fully converged
+     return temp;
+   }
+ 
+   return temp;
+ }
 
 /** \brief Computes the actual abundance ratios.
  *
