@@ -240,7 +240,7 @@ void sim::begrun1(const char *parameterFile)
 
 #ifdef STARFORMATION
   //CoolSfr.init_clouds();
-  this->init_starformation();  // This will set up units, initialize star formation log, and call init_clouds()
+  init_starformation();  // This will set up units, initialize star formation log, and call init_clouds()
 #endif
 
 #if((!defined(PMGRID) || (defined(PMGRID) && defined(TREEPM_NOTIMESPLIT))) && defined(SELFGRAVITY) && defined(PERIODIC)) || \
@@ -355,6 +355,31 @@ void sim::begrun2(void)
   gravity_forcetest_testforcelaw();
 #endif
 }
+
+// In begrun.cc - add this function implementation near the other sim:: functions
+#ifdef STARFORMATION
+void sim::init_starformation(void)
+{
+  mpi_printf("STARFORMATION: Initializing star formation module...\n");
+  
+  // Open star formation log file
+  if(ThisTask == 0)
+    {
+      char buf[MAXLEN_PATH];
+      snprintf(buf, MAXLEN_PATH, "%s/sfr.txt", All.OutputDir);
+      FILE *fd;
+      if(!(fd = fopen(buf, "w")))
+        Terminate("Cannot open file '%s' for writing star formation log.\n", buf);
+      
+      fprintf(fd, "# Time SFR\n");
+      fprintf(fd, "# a    Msun/yr\n");
+      fclose(fd);
+    }
+  
+  // Initialize the multi-phase model for star formation
+  CoolSfr.init_clouds();
+}
+#endif
 
 /*! \brief Computes conversion factors between internal code units and the
  *  cgs-system.

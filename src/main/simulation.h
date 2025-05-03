@@ -145,6 +145,7 @@ class sim : public pinning, public test_io_bandwidth
 #endif
 
  public:
+  void init_starformation(void);
   void hello(void);
   void endrun(void);
   void begrun1(const char *parameterFile);
