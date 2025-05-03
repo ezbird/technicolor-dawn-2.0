@@ -54,10 +54,11 @@ void coolsfr::InitCoolMemory()
  */
  double coolsfr::DoCooling(double u_old, double rho, double dt, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
 {
-  DoCool->u_old_input    = u_old;
-  DoCool->rho_input      = rho;
-  DoCool->dt_input       = dt;
-  DoCool->ne_guess_input = *ne_guess;
+    do_cool_data localDoCool;
+    localDoCool.u_old_input = u_old;
+    localDoCool.rho_input = rho;
+    localDoCool.dt_input = dt;
+    localDoCool.ne_guess_input = *ne_guess;
 
   if(!gsl_finite(u_old))
     Terminate("invalid input: u_old=%g\n", u_old);
@@ -147,7 +148,7 @@ void coolsfr::InitCoolMemory()
  *  \param rho   the proper density of the gas particle
  *  \param ne_guess electron number density relative to hydrogen number density (for molecular weight computation)
  */
-double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_state *gs, do_cool_data *DoCool)
+double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
 {
   DoCool->u_old_input    = u_old;
   DoCool->rho_input      = rho;
