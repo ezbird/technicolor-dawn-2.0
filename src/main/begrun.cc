@@ -240,7 +240,7 @@ void sim::begrun1(const char *parameterFile)
 
 #ifdef STARFORMATION
   //CoolSfr.init_clouds();
-  init_starformation();  // This will set up units, initialize star formation log, and call init_clouds()
+  init_starformation(this);  // This will set up units, initialize star formation log, and call init_clouds()
 #endif
 
 #if((!defined(PMGRID) || (defined(PMGRID) && defined(TREEPM_NOTIMESPLIT))) && defined(SELFGRAVITY) && defined(PERIODIC)) || \

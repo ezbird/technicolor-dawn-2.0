@@ -36,7 +36,7 @@
   *  It sets up the cooling units, initializes the star formation
   *  log file, and computes the tables for the effective model.
   */
- void init_starformation(void)
+ void init_starformation(sim *Sim)
  {
    TIMER_START(CPU_MISC);
  

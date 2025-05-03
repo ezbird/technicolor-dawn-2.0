@@ -49,7 +49,7 @@ class sim;
  };
  
  /* Function prototypes */
- void init_starformation(void);
+ void init_starformation(sim *Sim);
  void end_starformation(void);
  
  #endif /* STARFORMATION */
