@@ -55,7 +55,7 @@
      }
    
    /* Initialize the multi-phase model for star formation */
-   Mem.CoolSfr->init_clouds();
+   CoolSfr->init_clouds();
  
    TIMER_STOP(CPU_MISC);
  }

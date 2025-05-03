@@ -891,7 +891,7 @@ void coolsfr::rearrange_particle_sequence(simparticles *Sp)
   All.TotN_gas -= tot_diff;
   
   if(ThisTask == 0 && swap_count > 0)
-    mpi_printf("COOLSFR: Rearranged %d particles after star formation.\n", swap_count);
+    printf("COOLSFR: Rearranged %d particles after star formation.\n", swap_count);
 }
 
 /**
@@ -901,7 +901,7 @@ void coolsfr::init_star_formation_log(void)
 {
   if(ThisTask == 0)
     {
-      char buf[MAXLEN_PATH];
+      char buf[MAXLEN_PATH_EXTRA];
       sprintf(buf, "%s/sfr.txt", All.OutputDir);
       if(!(FdSfr = fopen(buf, "w")))
         Terminate("Cannot open file `%s' for writing star formation log.\n", buf);
