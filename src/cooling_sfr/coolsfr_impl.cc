@@ -578,7 +578,7 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
                 }
               
               // Random number for star formation decision
-              double rnd = get_random_number(Sp->P[target].ID.get() + 1);
+              double rnd = get_random_number( Sp->P[target].ID.get() + target + All.NumCurrentTiStep );
               
               // Create star if probability check passes
               create_star_particle(Sp, target, prob, rnd);
