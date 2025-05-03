@@ -31,6 +31,8 @@
 #include "../time_integration/timestep.h"
 #include "../cooling_sfr/cooling.h"
 
+#define eV_to_K 11604.505  // Conversion factor from eV to Kelvin
+
 /**
  * Set up units for the star formation code
  */
