@@ -149,7 +149,8 @@ struct global_data_all_processes : public parameters
   double BoxSize; /**< Boxsize in case periodic boundary conditions are used */
   double TargetGasMass;  // Target mass for gas particles
   double TempSfrThresh;  // Temperature threshold for star formation in K
-  /* Code options */
+
+  int TotN_gas;  // Total number of gas particles across all processes
 
   int ComovingIntegrationOn;  /**< flags that comoving integration is enabled */
   int TypeOfOpeningCriterion; /**< determines tree cell-opening criterion: 0 for Barnes-Hut, 1 for relative
