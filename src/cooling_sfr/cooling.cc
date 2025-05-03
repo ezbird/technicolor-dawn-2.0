@@ -52,7 +52,7 @@ void coolsfr::InitCoolMemory()
  *   \param ne_guess electron number density relative to hydrogen number density (for molecular weight computation)
  *   \return the new internal energy per unit mass of the gas particle
  */
-double coolsfr::DoCooling(double u_old, double rho, double dt, double *ne_guess, gas_state *gs, do_cool_data *DoCool)
+ double coolsfr::DoCooling(double u_old, double rho, double dt, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
 {
   DoCool->u_old_input    = u_old;
   DoCool->rho_input      = rho;
