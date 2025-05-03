@@ -112,7 +112,7 @@ void coolsfr::InitCoolMemory()
     {
       u = 0.5 * (u_lower + u_upper);
 
-      LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, localDoCool);
+      LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, &localDoCool);
 
       if(u - u_old - ratefact * LambdaNet * dt > 0)
         {
