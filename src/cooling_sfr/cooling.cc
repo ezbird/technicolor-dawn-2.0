@@ -80,7 +80,7 @@ void coolsfr::InitCoolMemory()
   double u_lower = u;
   double u_upper = u;
 
-  double LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, localDoCool);
+  double LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, &localDoCool);
 
   /* bracketing */
 
@@ -88,7 +88,7 @@ void coolsfr::InitCoolMemory()
     {
       u_upper *= sqrt(1.1);
       u_lower /= sqrt(1.1);
-      while(u_upper - u_old - ratefact * CoolingRateFromU(u_upper, rho, ne_guess, gs, localDoCool) * dt < 0)
+      while(u_upper - u_old - ratefact * CoolingRateFromU(u_upper, rho, ne_guess, gs, &localDoCool) * dt < 0)
         {
           u_upper *= 1.1;
           u_lower *= 1.1;
@@ -99,7 +99,7 @@ void coolsfr::InitCoolMemory()
     {
       u_lower /= sqrt(1.1);
       u_upper *= sqrt(1.1);
-      while(u_lower - u_old - ratefact * CoolingRateFromU(u_lower, rho, ne_guess, gs, localDoCool) * dt > 0)
+      while(u_lower - u_old - ratefact * CoolingRateFromU(u_lower, rho, ne_guess, gs, &localDoCool) * dt > 0)
         {
           u_upper /= 1.1;
           u_lower /= 1.1;
@@ -166,7 +166,7 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
 
   double u = u_old;
 
-  double LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, localDoCool);
+  double LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, &localDoCool);
 
   /* bracketing */
 
