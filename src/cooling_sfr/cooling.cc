@@ -136,7 +136,7 @@ void coolsfr::InitCoolMemory()
     Terminate(
         "failed to converge in DoCooling(): DoCool->u_old_input=%g\nDoCool->rho_input= %g\nDoCool->dt_input= "
         "%g\nDoCool->ne_guess_input= %g\n",
-        localDoCool->u_old_input, localDoCool->rho_input, localDoCool->dt_input, localDoCool->ne_guess_input);
+        localDoCool.u_old_input, localDoCool.rho_input, localDoCool.dt_input, localDoCool.ne_guess_input);
 
   u *= All.UnitDensity_in_cgs / All.UnitPressure_in_cgs; /* to internal units */
 
