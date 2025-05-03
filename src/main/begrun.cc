@@ -356,7 +356,12 @@ void sim::begrun2(void)
 #endif
 }
 
-// In begrun.cc - add this function implementation near the other sim:: functions
+ /*! \brief Initialize star formation module
+  *
+  *  This function initializes the star formation module.
+  *  It sets up the cooling units, initializes the star formation
+  *  log file, and computes the tables for the effective model.
+  */
 #ifdef STARFORMATION
 void sim::init_starformation(void)
 {

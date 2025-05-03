@@ -30,38 +30,7 @@
  
  extern coolsfr CoolSfr;  // This declares that CoolSfr is defined elsewhere
 
- /*! \brief Initialize star formation module
-  *
-  *  This function initializes the star formation module.
-  *  It sets up the cooling units, initializes the star formation
-  *  log file, and computes the tables for the effective model.
-  */
-  void sim::init_starformation(void)
- {
-   TIMER_START(CPU_MISC);
- 
-   printf("STARFORMATION: Initializing star formation module...\n");
-   
-   /* Initialize the star formation log file */
-   if(ThisTask == 0)
-     {
-       char buf[MAXLEN_PATH];
-       sprintf(buf, "%s/sfr.txt", All.OutputDir);
-       FILE *fd;
-       if(!(fd = fopen(buf, "w")))
-         Terminate("Cannot open file '%s' for writing star formation log.\n", buf);
-       
-       fprintf(fd, "# Time SFR\n");
-       fprintf(fd, "# a    Msun/yr\n");
-       fclose(fd);
-     }
-   
-   /* Initialize the multi-phase model for star formation */
-   CoolSfr.init_clouds();
- 
-   TIMER_STOP(CPU_MISC);
- }
- 
+
  /*! \brief Finalize star formation module
   *
   *  This function closes the star formation log file
