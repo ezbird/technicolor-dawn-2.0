@@ -45,7 +45,7 @@
    void set_units_sfr(void);
    void cooling_and_starformation(simparticles *Sp);
    void init_clouds(void);
-   void init_star_formation_log(void);
+  
    void close_star_formation_log(void);
    void integrate_sfr(void);
    void rearrange_particle_sequence(simparticles *Sp);
