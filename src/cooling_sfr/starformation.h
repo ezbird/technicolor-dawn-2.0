@@ -20,6 +20,9 @@
  /* Forward declaration */
  class simparticles;
  
+ // Forward declaration for the simulation class
+class sim;
+
  /* Starformation configuration parameters */
  struct starformation_params
  {
