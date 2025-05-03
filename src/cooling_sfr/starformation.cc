@@ -20,10 +20,12 @@
  #include <string.h>
  
  #include "../cooling_sfr/cooling.h"
+ #include "../cooling_sfr/starformation.h"
  #include "../data/allvars.h"
  #include "../data/dtypes.h"
- #include "../data/simparticles.h"
+ #include "../data/mymalloc.h"
  #include "../logs/logs.h"
+ #include "../logs/timer.h"
  #include "../system/system.h"
  
  /*! \brief Initialize star formation module
@@ -32,22 +34,30 @@
   *  It sets up the cooling units, initializes the star formation
   *  log file, and computes the tables for the effective model.
   */
- void sim::init_starformation(void)
+ void init_starformation(void)
  {
-   TIMER_START(CPU_INIT_STARFORMATION);
+   TIMER_START(CPU_MISC);
  
    mpi_printf("STARFORMATION: Initializing star formation module...\n");
- 
-   /* Set up units for cooling and star formation */
-   Mem.CoolSfr->set_units_sfr();
    
    /* Initialize the star formation log file */
-   Mem.CoolSfr->init_star_formation_log();
+   if(ThisTask == 0)
+     {
+       char buf[MAXLEN_PATH];
+       sprintf(buf, "%s/sfr.txt", All.OutputDir);
+       FILE *fd;
+       if(!(fd = fopen(buf, "w")))
+         Terminate("Cannot open file '%s' for writing star formation log.\n", buf);
+       
+       fprintf(fd, "# Time SFR\n");
+       fprintf(fd, "# a    Msun/yr\n");
+       fclose(fd);
+     }
    
    /* Initialize the multi-phase model for star formation */
    Mem.CoolSfr->init_clouds();
  
-   TIMER_STOP(CPU_INIT_STARFORMATION);
+   TIMER_STOP(CPU_MISC);
  }
  
  /*! \brief Finalize star formation module
@@ -55,12 +65,11 @@
   *  This function closes the star formation log file
   *  when the simulation ends.
   */
- void sim::end_starformation(void)
+ void end_starformation(void)
  {
    TIMER_START(CPU_MISC);
  
-   /* Close the star formation log file */
-   Mem.CoolSfr->close_star_formation_log();
+   mpi_printf("STARFORMATION: Ending star formation module...\n");
  
    TIMER_STOP(CPU_MISC);
  }
