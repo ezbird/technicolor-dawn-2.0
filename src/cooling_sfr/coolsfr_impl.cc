@@ -613,41 +613,40 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
 /**
  * Helper function to get a random number for a given seed
  */
-double coolsfr::get_random_number(int id)
-{
-
-  // Test the random number output
-  if(ThisTask == 0)
-  {
-    static int rnd_checks = 0;
-    if(rnd_checks < 5)
-    {
-      double test_rnd = get_random_number(id); // Call the original function
-      printf("STARFORMATION: id=%d, rnd=%g\n", id, test_rnd);
-      rnd_checks++;
-    }
-  }
-
-  // Implementation adapted from Gadget's random number generator
-  double dum;
-  
-  id %= 1000000;
-  
-  int ia = 16807;
-  int im = 2147483647;
-  int iq = 127773;
-  int ir = 2836;
-  int iy, k;
-  
-  k = id / iq;
-  id = ia * (id - k * iq) - ir * k;
-  if(id < 0) id += im;
-  iy = id;
-  
-  dum = iy / (double)im;
-  
-  return dum;
-}
+ double coolsfr::get_random_number(int id)
+ {
+   // Make sure ID is positive to avoid issues
+   unsigned int posid = (id < 0) ? (unsigned int)(-id) : (unsigned int)(id);
+   
+   // Modulo to prevent integer overflow issues
+   posid %= 1000000;
+   
+   int ia = 16807;
+   int im = 2147483647;
+   int iq = 127773;
+   int ir = 2836;
+   int iy, k;
+   
+   k = posid / iq;
+   posid = ia * (posid - k * iq) - ir * k;
+   if(posid < 0) posid += im;
+   iy = posid;
+   
+   double dum = iy / (double)im;
+   
+   // For debugging - but without recursive call!
+   if(ThisTask == 0)
+   {
+     static int rnd_checks = 0;
+     if(rnd_checks < 5)
+     {
+       printf("STARFORMATION: random id=%d, result=%g\n", id, dum);
+       rnd_checks++;
+     }
+   }
+   
+   return dum;
+ }
 
 /**
  * Create a wind particle from a gas particle
