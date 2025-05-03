@@ -369,17 +369,22 @@ void sim::init_starformation(void)
   
   // Open star formation log file
   if(ThisTask == 0)
-    {
+  {
       char buf[MAXLEN_PATH];
-      snprintf(buf, MAXLEN_PATH, "%s/sfr.txt", All.OutputDir);
+      // Make sure there's room for the slash if OutputDir doesn't end with one
+      if (All.OutputDir[strlen(All.OutputDir)-1] != '/')
+          snprintf(buf, MAXLEN_PATH, "%s/sfr.txt", All.OutputDir);
+      else
+          snprintf(buf, MAXLEN_PATH, "%ssfr.txt", All.OutputDir);
+      
       FILE *fd;
       if(!(fd = fopen(buf, "w")))
-        Terminate("Cannot open file '%s' for writing star formation log.\n", buf);
+          Terminate("Cannot open file '%s' for writing star formation log.\n", buf);
       
       fprintf(fd, "# Time SFR\n");
       fprintf(fd, "# a    Msun/yr\n");
       fclose(fd);
-    }
+  }
   
   // Initialize the multi-phase model for star formation
   CoolSfr.init_clouds();
