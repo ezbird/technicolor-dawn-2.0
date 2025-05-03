@@ -579,13 +579,6 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
   double glob_totsfr;
   MPI_Allreduce(&total_sfr, &glob_totsfr, 1, MPI_DOUBLE, MPI_SUM, Communicator);
   
-  if(ThisTask == 0)
-    {
-      // Write to star formation log file
-      fprintf(FdSfr, "%g %g\n", All.Time, glob_totsfr);
-      fflush(FdSfr);
-    }
-  
   TIMER_STOP(CPU_COOLING_SFR);
 }
 
@@ -894,35 +887,6 @@ void coolsfr::rearrange_particle_sequence(simparticles *Sp)
     printf("COOLSFR: Rearranged %d particles after star formation.\n", swap_count);
 }
 
-/**
- * Create the star formation log file
- */
-void coolsfr::init_star_formation_log(void)
-{
-  if(ThisTask == 0)
-    {
-      char buf[MAXLEN_PATH_EXTRA];
-      sprintf(buf, "%s/sfr.txt", All.OutputDir);
-      if(!(FdSfr = fopen(buf, "w")))
-        Terminate("Cannot open file `%s' for writing star formation log.\n", buf);
-      
-      fprintf(FdSfr, "# Time SFR\n");
-      fprintf(FdSfr, "# a    Msun/yr\n");
-    }
-}
-
-/**
- * Close the star formation log file
- */
-void coolsfr::close_star_formation_log(void)
-{
-  if(ThisTask == 0)
-    {
-      if(FdSfr)
-        fclose(FdSfr);
-      FdSfr = NULL;
-    }
-}
 
 #endif /* STARFORMATION */
 #endif /* COOLING */
