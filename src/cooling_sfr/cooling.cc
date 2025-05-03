@@ -30,6 +30,9 @@
 #include "../system/system.h"
 #include "../time_integration/timestep.h"
 
+#define eV_to_K 11604.505    // Conversion factor from eV to Kelvin
+#define eV_to_erg 1.602e-12  // Conversion factor from eV to erg
+
 // ----------------------------------------------------------------------
 // Allocate the rate table for NCOOLTAB+1 entries
 // ----------------------------------------------------------------------
@@ -77,7 +80,7 @@ void coolsfr::InitCoolMemory()
   double u_lower = u;
   double u_upper = u;
 
-  double LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, DoCool);
+  double LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, localDoCool);
 
   /* bracketing */
 
@@ -85,7 +88,7 @@ void coolsfr::InitCoolMemory()
     {
       u_upper *= sqrt(1.1);
       u_lower /= sqrt(1.1);
-      while(u_upper - u_old - ratefact * CoolingRateFromU(u_upper, rho, ne_guess, gs, DoCool) * dt < 0)
+      while(u_upper - u_old - ratefact * CoolingRateFromU(u_upper, rho, ne_guess, gs, localDoCool) * dt < 0)
         {
           u_upper *= 1.1;
           u_lower *= 1.1;
@@ -96,7 +99,7 @@ void coolsfr::InitCoolMemory()
     {
       u_lower /= sqrt(1.1);
       u_upper *= sqrt(1.1);
-      while(u_lower - u_old - ratefact * CoolingRateFromU(u_lower, rho, ne_guess, gs, DoCool) * dt > 0)
+      while(u_lower - u_old - ratefact * CoolingRateFromU(u_lower, rho, ne_guess, gs, localDoCool) * dt > 0)
         {
           u_upper /= 1.1;
           u_lower /= 1.1;
@@ -109,7 +112,7 @@ void coolsfr::InitCoolMemory()
     {
       u = 0.5 * (u_lower + u_upper);
 
-      LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, DoCool);
+      LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, localDoCool);
 
       if(u - u_old - ratefact * LambdaNet * dt > 0)
         {
@@ -133,7 +136,7 @@ void coolsfr::InitCoolMemory()
     Terminate(
         "failed to converge in DoCooling(): DoCool->u_old_input=%g\nDoCool->rho_input= %g\nDoCool->dt_input= "
         "%g\nDoCool->ne_guess_input= %g\n",
-        DoCool->u_old_input, DoCool->rho_input, DoCool->dt_input, DoCool->ne_guess_input);
+        localDoCool->u_old_input, localDoCool->rho_input, localDoCool->dt_input, localDoCool->ne_guess_input);
 
   u *= All.UnitDensity_in_cgs / All.UnitPressure_in_cgs; /* to internal units */
 
@@ -150,9 +153,10 @@ void coolsfr::InitCoolMemory()
  */
 double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
 {
-  DoCool->u_old_input    = u_old;
-  DoCool->rho_input      = rho;
-  DoCool->ne_guess_input = *ne_guess;
+    do_cool_data localDoCool;
+    localDoCool.u_old_input = u_old;
+    localDoCool.rho_input = rho;
+    localDoCool.ne_guess_input = *ne_guess;
 
   rho *= All.UnitDensity_in_cgs * All.HubbleParam * All.HubbleParam; /* convert to physical cgs units */
   u_old *= All.UnitPressure_in_cgs / All.UnitDensity_in_cgs;
@@ -162,7 +166,7 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
 
   double u = u_old;
 
-  double LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, DoCool);
+  double LambdaNet = CoolingRateFromU(u, rho, ne_guess, gs, localDoCool);
 
   /* bracketing */
 
