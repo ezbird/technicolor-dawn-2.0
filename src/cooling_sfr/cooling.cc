@@ -216,7 +216,7 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
    double max = 0;
    int iter   = 0;
    double temp_old;
-   int MAXITER = 50; // Increased from typical 30
+   int MAXTRIES = 50; // Increased from typical 30
    double TOLERANCE = 1.0e-3; // Can be adjusted based on your simulation
  
    do
@@ -249,14 +249,14 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
      iter++;
  
      // Debug output for the last iterations
-     if(iter > (MAXITER - 10))
+     if(iter > (MAXTRIES - 10))
      {
        printf("-> temp= %g ne=%g\n", temp, *ne_guess);
      }
    }
-   while(fabs(temp - temp_old) > TOLERANCE * temp && iter < MAXITER);
+   while(fabs(temp - temp_old) > TOLERANCE * temp && iter < MAXTRIES);
  
-   if(iter >= MAXITER)
+   if(iter >= MAXTRIES)
    {
      // Instead of terminating, just warn and use last value
      printf("Warning: Failed to converge in convert_u_to_temp()\n");
