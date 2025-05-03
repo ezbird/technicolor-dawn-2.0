@@ -118,6 +118,8 @@ CritPhysDensity       0          % critical physical density for star formation 
 PhysDensThresh        0.0
 CritHydrogenDensity   0.1        % only form stars where n_H > 0.1 cm^-3
 TreecoolFile          data/TREECOOL
+TargetGasMass         1.0e5      # Target gas particle mass in code units
+TempSfrThresh         15000.0    # Temperature threshold for star formation in K
 
 % ---- Wind
 WindEfficiency        2.0

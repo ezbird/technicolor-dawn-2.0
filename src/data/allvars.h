@@ -147,7 +147,8 @@ struct global_data_all_processes : public parameters
                        */
   double MinGasHsml;
   double BoxSize; /**< Boxsize in case periodic boundary conditions are used */
-
+  double TargetGasMass;  // Target mass for gas particles
+  double TempSfrThresh;  // Temperature threshold for star formation in K
   /* Code options */
 
   int ComovingIntegrationOn;  /**< flags that comoving integration is enabled */

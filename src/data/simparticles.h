@@ -49,7 +49,7 @@ class simparticles : public intposconvert, public setcomm
   long long TotNumGas;  /**<  total gas particle number (global value) */
 
   typedef particle_data pdata;
-
+  int SfFlag;
   /*! This structure holds all the information that is
    * stored for each particle of the simulation.
    */
