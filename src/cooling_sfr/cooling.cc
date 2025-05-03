@@ -833,7 +833,7 @@ void coolsfr::cooling_only(simparticles *Sp) /* normal cooling routine when star
  *
  *  \param i index of the gas particle to which cooling is applied
  */
-void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, do_cool_data *DoCool)
+ void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, const do_cool_data *DoCool)
 {
   double dens = Sp->SphP[i].Density;
 
