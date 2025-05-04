@@ -248,7 +248,7 @@ temp_old = temp;
 }
 
 // if we get here, we failed to converge – warn and return last value
-Warning("convert_u_to_temp did not converge in %d iterations, T≈%g K", MAX_ITERS, temp);
+printf("convert_u_to_temp did not converge in %d iterations, T≈%g K", MAX_ITERS, temp);
 return temp;
 }
 
