@@ -191,85 +191,67 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
  *  \param ne_guess electron number density relative to hydrogen number density
  *  \return the gas temperature
  */
- double coolsfr::convert_u_to_temp(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
- {
-   // Input parameters for debugging
-   double u_input   = u;
-   double rho_input = rho;
-   double ne_input  = *ne_guess;
- 
-   // Handle negative energy (shouldn't happen but just in case)
-   if(u <= 0)
-   {
-     *ne_guess = 0;
-     return 1.0; // Return minimal temperature
-   }
- 
-   // Initial temperature guess
-   double mu   = (1 + 4 * gs->yhelium) / (1 + gs->yhelium + *ne_guess);
-   double temp = GAMMA_MINUS1 / BOLTZMANN * u * PROTONMASS * mu;
- 
-   // If temperature is too high or too low, restrict to sensible range
-   if(temp > 1e12) temp = 1e12;
-   if(temp < 1.0) temp = 1.0;
- 
-   double max = 0;
-   int iter   = 0;
-   double temp_old;
-   int MAXTRIES = 50; // Increased from typical 30
-   double TOLERANCE = 1.0e-3; // Can be adjusted based on your simulation
- 
-   do
-   {
-     double ne_old = *ne_guess;
- 
-     find_abundances_and_rates(log10(temp), rho, ne_guess, gs, DoCool);
-     temp_old = temp;
- 
-     mu = (1 + 4 * gs->yhelium) / (1 + gs->yhelium + *ne_guess);
- 
-     double temp_new = GAMMA_MINUS1 / BOLTZMANN * u * PROTONMASS * mu;
- 
-     // Guard against non-physical values
-     if(!isfinite(temp_new) || temp_new <= 0)
-     {
-       temp_new = temp_old > 0 ? temp_old : 1.0;
-     }
- 
-     // Modified damping to prevent oscillations
-     max = std::max<double>(max, temp_new / (1 + gs->yhelium + *ne_guess) * fabs((*ne_guess - ne_old) / (temp_new - temp_old + 1.0)));
-     
-     // Apply stronger damping as iterations increase
-     double damping = 1.0 + max * (1.0 + 0.1 * iter);
-     temp = temp_old + (temp_new - temp_old) / damping;
-     
-     // Guard against temperature going out of bounds
-     if(temp <= 0 || !isfinite(temp)) temp = temp_old > 0 ? temp_old : 1.0;
-     
-     iter++;
- 
-     // Debug output for the last iterations
-     if(iter > (MAXTRIES - 10))
-     {
-       printf("-> temp= %g ne=%g\n", temp, *ne_guess);
-     }
-   }
-   while(fabs(temp - temp_old) > TOLERANCE * temp && iter < MAXTRIES);
- 
-   if(iter >= MAXTRIES)
-   {
-     // Instead of terminating, just warn and use last value
-     printf("Warning: Failed to converge in convert_u_to_temp()\n");
-     printf("u_input= %g\nrho_input=%g\n ne_input=%g\n", u_input, rho_input, ne_input);
-     printf("DoCool->u_old_input=%g\nDoCool->rho_input= %g\nDoCool->dt_input= %g\nDoCool->ne_guess_input= %g\n", 
-            DoCool->u_old_input, DoCool->rho_input, DoCool->dt_input, DoCool->ne_guess_input);
-     
-     // Return the last calculated temperature even if not fully converged
-     return temp;
-   }
- 
-   return temp;
- }
+ double coolsfr::convert_u_to_temp(double u, double rho, double *ne_guess,
+  gas_state *gs, const do_cool_data *DoCool)
+{
+// --- Convert code‐units of u (erg/g in code) to physical cgs units ---
+//   u_code × (UnitEnergy_in_cgs / UnitMass_in_g) → u_cgs [erg/g]
+double u_cgs = u * (All.UnitEnergy_in_cgs / All.UnitMass_in_g);
+
+// Handle non‐positive internal energy
+if(u_cgs <= 0.0) {
+*ne_guess = 0.0;
+return 1.0;  // floor at 1 K
+}
+
+// Initial guess for μ = mean molecular weight
+double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + *ne_guess);
+
+// Initial temperature estimate in Kelvin:
+//   (γ−1) u [erg/g] × (m_p/k_B) × μ → T [K]
+double temp = GAMMA_MINUS1 * u_cgs * PROTONMASS / BOLTZMANN * mu;
+
+// enforce physical bounds on the guess
+temp = std::min(std::max(temp, 1.0), 1e12);
+
+// solver parameters
+const int    MAX_ITERS      = 50;
+const double REL_TOL       = 1e-3;    // relative tolerance
+const double ABS_TOL       = 1e-6;    // absolute tolerance in K
+
+double temp_old = temp;
+for(int iter = 0; iter < MAX_ITERS; ++iter) {
+double ne_old = *ne_guess;
+
+// update electron fraction & rates at current T
+find_abundances_and_rates(std::log10(temp), rho, ne_guess, gs, DoCool);
+
+// recompute μ with updated ne
+mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + *ne_guess);
+
+// new temperature from updated μ
+double temp_new = GAMMA_MINUS1 * u_cgs * PROTONMASS / BOLTZMANN * mu;
+
+// damp oscillations lightly
+double damping = 1.0 + 0.1 * iter;
+temp = temp_old + (temp_new - temp_old)/damping;
+
+// clamp to physical range each iteration
+temp = std::min(std::max(temp, 1.0), 1e12);
+
+// convergence check: either relative or absolute
+double dt = std::abs(temp - temp_old);
+if(dt < std::max(REL_TOL*temp, ABS_TOL)) {
+return temp; 
+}
+temp_old = temp;
+}
+
+// if we get here, we failed to converge – warn and return last value
+Warning("convert_u_to_temp did not converge in %d iterations, T≈%g K", MAX_ITERS, temp);
+return temp;
+}
+
 
 /** \brief Computes the actual abundance ratios.
  *

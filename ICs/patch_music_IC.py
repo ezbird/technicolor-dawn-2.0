@@ -18,7 +18,8 @@ outfile = "IC_gadget4_32_100kpc.hdf5"
 # A value of 5 would be T = 5 × (5.0 × 10^-10) × (2/3) × 1.67 × 10^-24 × 1.22 / 1.38 × 10^-16 ≈ 50,000K
 # A value of 0.01 would be ~100K
 # A value of 0.1 would be ~1000K
-u_gas = 0.05  # Internal energy in Gadget units
+# Aye! or, 200 should be about 10^4 Kelvin, ideal for starts a sim
+u_gas = 200  # Internal energy in Gadget units
 
 # Create a copy of the input file so we don't modify the original
 shutil.copy(infile, outfile)
