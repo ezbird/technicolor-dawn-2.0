@@ -468,9 +468,13 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
           
           double utherm = Sp->get_utherm_from_entropy(target);
           double rho = Sp->SphP[target].Density * All.cf_a3inv;
-          
+          double currentTemp = convert_u_to_temp(utherm, rho, &Sp->SphP[target].Ne, &gs, &DoCool);
+
+          printf("STARFORMATION - Testing whether to make new star: %d, currentTemp=%g, rho=%g, PhysDensThresh=%g\n", 
+            target, currentTemp, Sp->SphP[target].Density * All.cf_a3inv, All.PhysDensThresh);
+
           // Standard density-threshold star formation
-          if(convert_u_to_temp(utherm, rho, &Sp->SphP[target].Ne, &gs, &DoCool) < All.MaxStarFormationTemp) 
+          if(currentTemp < All.MaxStarFormationTemp) 
             {
               if(rho >= All.PhysDensThresh) {
                 Sp->SphP[target].SfFlag = 1;
@@ -519,7 +523,7 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
                     static int printed = 0;
                     if(printed < 5)
                     {
-                    mpi_printf("STARFORMATION: particle %d, rho=%g, thresh=%g, xcloud=%g, sfr=%g\n", 
+                    mpi_printf("STARFORMATION: particle %d, rho=%g, PhysDensThresh=%g, xcloud=%g, sfr=%g\n", 
                                 target, Sp->SphP[target].Density * All.cf_a3inv, All.PhysDensThresh, xcloud, sfr);
                     printed++;
                     }
