@@ -117,7 +117,6 @@ void global_data_all_processes::register_parameters(void)
   add_param("MinEgySpec", &MinEgySpec, PARAM_DOUBLE, PARAM_CHANGEABLE);
 
   add_param("TargetGasMass", &TargetGasMass, PARAM_DOUBLE, PARAM_FIXED);
-  add_param("TempSfrThresh", &TempSfrThresh, PARAM_DOUBLE, PARAM_FIXED);
 
   for(int i = 0; i < NSOFTCLASSES; i++)
     {
@@ -198,7 +197,6 @@ void global_data_all_processes::register_parameters(void)
   add_param("WindEnergyFraction", &WindEnergyFraction, PARAM_DOUBLE, PARAM_FIXED);
   add_param("WindFreeTravelLength", &WindFreeTravelLength, PARAM_DOUBLE, PARAM_FIXED);
   add_param("WindFreeTravelDensFac", &WindFreeTravelDensFac, PARAM_DOUBLE, PARAM_FIXED);
-  add_param("CritHydrogenDensity", &CritHydrogenDensity, PARAM_DOUBLE, PARAM_FIXED);
 
   add_param("FeedbackDebug", &FeedbackDebug, PARAM_INT, PARAM_FIXED);
   add_param("StarFormationDebug", &StarFormationDebug, PARAM_INT, PARAM_FIXED);

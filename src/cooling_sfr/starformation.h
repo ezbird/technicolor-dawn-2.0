@@ -40,11 +40,6 @@ class sim;
    double TargetGasMass;
    double GInternal;        /* Internal G for some SF models */
    
-   /* Additional parameters for H2-regulated star formation */
- #ifdef H2REGSF
-   double OTUVThresh;       /* Threshold for OTUV field */
-   double SIGMA_NORM;       /* Surface density normalization */
- #endif
  };
  
  /* Function prototypes */
