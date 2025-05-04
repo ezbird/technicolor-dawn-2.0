@@ -33,7 +33,6 @@ class sim;
    double TempSupernova;
    double TempClouds;
    double MaxSfrTimescale;
-   double TempSfrThresh;
    double WindEfficiency;
    double WindEnergyFraction;
    double WindFreeTravelLength;

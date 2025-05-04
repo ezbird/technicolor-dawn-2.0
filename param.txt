@@ -107,19 +107,17 @@ MinGasHsml                   1.0e-4     ; we can get negative smoothing lengths 
 %----- Star formation
 StarformationMode     1
 MetalYield            0.02
-MaxSfrTimescale       1.0        % usually 1.5; Gas consumption timescale (multi-phase model)
+MaxSfrTimescale       1.5        % usually 1.5; Gas consumption timescale (multi-phase model)
 MaxStarFormationTemp  15000      % only form stars where T < 15000 K
 FactorSN              0.1      % beta, mass fraction of massive stars (multi-phase model)
 FactorEVP             1000       % A_0, evaporation parameter (multi-phase model); smaller value means lower pressure support, making it easier for gas to collapse
 TempSupernova         1e8        % T_SN, effective "supernova temperature",sets feedback energy (multi-phase model)
 TempClouds            1000       % temperature of cold clouds (multi-phase model)
 CritOverDensity       50        % default is 57.7; overdensity threshold value for cosmological sims; lower value means conditions easier to reach for SF
-CritPhysDensity       0          % critical physical density for star formation (in cm^(-3))
-PhysDensThresh        0.0
-CritHydrogenDensity   0.1        % only form stars where n_H > 0.1 cm^-3
+CritPhysDensity       0.1          % critical physical density for star formation (in cm^(-3))
+PhysDensThresh        0.0        % this gets set at runtime in coolsfr::set_units_sfr(void)
 TreecoolFile          data/TREECOOL
 TargetGasMass         1.0e5      # Target gas particle mass in code units
-TempSfrThresh         15000.0    # Temperature threshold for star formation in K
 
 % ---- Wind
 WindEfficiency        2.0

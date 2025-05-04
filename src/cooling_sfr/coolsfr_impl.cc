@@ -469,20 +469,19 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
           double utherm = Sp->get_utherm_from_entropy(target);
           double rho = Sp->SphP[target].Density * All.cf_a3inv;
           
-#if !defined(H2REGSF) && !defined(SGREGSF) && !defined(H2AUTOSHIELD)
           // Standard density-threshold star formation
-          if(convert_u_to_temp(utherm, rho, &Sp->SphP[target].Ne, &gs, &DoCool) < All.TempSfrThresh) 
+          if(convert_u_to_temp(utherm, rho, &Sp->SphP[target].Ne, &gs, &DoCool) < All.MaxStarFormationTemp) 
             {
-              if(rho >= All.PhysDensThresh)
+              if(rho >= All.PhysDensThresh) {
                 Sp->SphP[target].SfFlag = 1;
                 sf_eligible++;
+              }
             }
             
           // Additional cosmological threshold check
           if(All.ComovingIntegrationOn)
             if(Sp->SphP[target].Density < All.OverDensThresh)
               Sp->SphP[target].SfFlag = 0;
-#endif
 
 #ifdef WINDS
           // Handle wind particles
@@ -530,16 +529,10 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
               double tsfr, factorEVP, egyhot, egyeff, egyold, egycurrent;
               double ne = Sp->SphP[target].Ne;
               
-#if !defined(H2REGSF) && !defined(SGREGSF) && !defined(H2AUTOSHIELD)
               // Standard model
               tsfr = sqrt(All.PhysDensThresh / rho) * All.MaxSfrTimescale;
               factorEVP = pow(rho / All.PhysDensThresh, -0.8) * All.FactorEVP;
               egyhot = All.EgySpecSN / (1 + factorEVP) + All.EgySpecCold;
-#else
-              // For H2 or SG models, use values from get_starformation_rate
-              factorEVP = pow(rho / All.PhysDensThresh, -0.8) * All.FactorEVP;
-              egyhot = All.EgySpecSN / (1 + factorEVP) + All.EgySpecCold;
-#endif
 
               double cloudmass = xcloud * Sp->P[target].getMass();
               if(tsfr < dtime) tsfr = dtime;
