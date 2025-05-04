@@ -615,37 +615,37 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
  */
  double coolsfr::get_random_number(int id)
  {
-   // Make sure ID is positive to avoid issues
-   unsigned int posid = (id < 0) ? (unsigned int)(-id) : (unsigned int)(id);
+   // Mix the seed with current time to increase randomness
+   unsigned int seed = (unsigned int)id;
+   seed = seed ^ (unsigned int)(All.Time * 1000000.0);
    
-   // Modulo to prevent integer overflow issues
-   posid %= 1000000;
+   // Add a mixing step (simple hash function)
+   seed = (seed * 2654435761U) % UINT_MAX;
    
+   // Use the standard random number generator steps
    int ia = 16807;
    int im = 2147483647;
    int iq = 127773;
    int ir = 2836;
-   int iy, k;
    
-   k = posid / iq;
-   posid = ia * (posid - k * iq) - ir * k;
-   if(posid < 0) posid += im;
-   iy = posid;
+   int k = seed / iq;
+   unsigned int temp = ia * (seed - k * iq) - ir * k;
+   if(temp < 0) temp += im;
    
-   double dum = iy / (double)im;
+   double result = temp / (double)im;
    
-   // For debugging - but without recursive call!
+   // For debugging
    if(ThisTask == 0)
    {
      static int rnd_checks = 0;
      if(rnd_checks < 5)
      {
-       printf("STARFORMATION: random id=%d, result=%g\n", id, dum);
+       printf("STARFORMATION: random id=%d, seed=%u, result=%g\n", id, seed, result);
        rnd_checks++;
      }
    }
    
-   return dum;
+   return result;
  }
 
 /**
