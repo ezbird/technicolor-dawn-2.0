@@ -1,4 +1,6 @@
-
+# gadget files to leave out of the repository
+eos.txt
+sfrrate.txt
 
 #eclipse stuff
 .cproject
