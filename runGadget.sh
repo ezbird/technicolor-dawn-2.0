@@ -6,8 +6,8 @@ start_total=$(date +%s)
 echo "[runGadget] Resetting output directory..."
 start=$(date +%s)
 rm -r output
-rm eos.txt
-rm sfrrate.txt
+#rm eos.txt
+#rm sfrrate.txt
 end=$(date +%s)
 echo "[runGadget] Output reset took $((end - start)) seconds."
 
