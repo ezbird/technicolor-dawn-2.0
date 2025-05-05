@@ -838,18 +838,18 @@ void coolsfr::MakeCoolingTable()
     // Use min_energy instead of All.MinEgySpec for the temperature floor
     double unew = DoCooling(std::max<double>(min_energy, utherm), dens * All.cf_a3inv, dtime, &ne, gs, DoCool);
  
-   Sp->SphP[i].Ne = ne;
+    Sp->SphP[i].Ne = ne;
  
-   if(unew < 0)
-     Terminate("invalid temperature: i=%d unew=%g\n", i, unew);
+    if(unew < 0)
+       Terminate("invalid temperature: i=%d unew=%g\n", i, unew);
  
-   double du = unew - utherm;
+    double du = unew - utherm;
  
-   // Apply temperature floor based on MinGasTemp
-   if(unew < min_energy)
-     du = min_energy - utherm;
+    // Apply temperature floor based on MinGasTemp
+    if(unew < min_energy)
+      du = min_energy - utherm;
  
-   utherm += du;
+    utherm += du;
  
  #ifdef OUTPUT_COOLHEAT
    if(dtime > 0)
