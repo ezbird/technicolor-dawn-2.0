@@ -284,14 +284,17 @@ void sim::init(int RestartSnapNum)
         }
     }
 
+    // Apply the floor to entropy
     for(int i = 0; i < Sp.NumGas; i++) {
-        // Convert MinGasTemp to minimum specific energy based on ionization state
-        double ne = Sp.SphP[i].Ne; // Get electron abundance
-        double mu = (1.0 + 4.0 * HYDROGEN_MASSFRAC) / (1.0 + HYDROGEN_MASSFRAC + ne);
-        double min_energy = All.MinGasTemp * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mu);
-        
-        Sp.SphP[i].Entropy = std::max<double>(min_energy, Sp.SphP[i].Entropy);
-    }
+      // Convert MinGasTemp to minimum specific energy with proper unit conversion
+      double ne = Sp.SphP[i].Ne;
+      double mu = (1.0 + 4.0 * HYDROGEN_MASSFRAC) / (1.0 + HYDROGEN_MASSFRAC + ne);
+      double min_energy = All.MinGasTemp * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mu);
+      // Convert from CGS to code units
+      min_energy *= All.UnitMass_in_g / All.UnitEnergy_in_cgs;
+      
+      Sp.SphP[i].Entropy = std::max<double>(min_energy, Sp.SphP[i].Entropy);
+  }
 
 #ifdef COOLING
   CoolSfr.IonizeParams();

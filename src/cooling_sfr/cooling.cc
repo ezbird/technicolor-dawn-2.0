@@ -829,12 +829,15 @@ void coolsfr::MakeCoolingTable()
  
    double ne = Sp->SphP[i].Ne; /* electron abundance (gives ionization state and mean molecular weight) */
    
-   // Calculate minimum energy from MinGasTemp
-   double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + ne);
-   double min_energy = All.MinGasTemp * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mu);
+    // Calculate minimum energy from MinGasTemp (with proper unit conversion)
+    double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + ne);
+    double min_energy = All.MinGasTemp * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mu);
+    // Convert from CGS to code units
+    min_energy *= All.UnitMass_in_g / All.UnitEnergy_in_cgs;
+
+    // Use min_energy instead of All.MinEgySpec for the temperature floor
+    double unew = DoCooling(std::max<double>(min_energy, utherm), dens * All.cf_a3inv, dtime, &ne, gs, DoCool);
  
-   // Use min_energy instead of All.MinEgySpec for the temperature floor
-   double unew = DoCooling(std::max<double>(min_energy, utherm), dens * All.cf_a3inv, dtime, &ne, gs, DoCool);
    Sp->SphP[i].Ne = ne;
  
    if(unew < 0)
