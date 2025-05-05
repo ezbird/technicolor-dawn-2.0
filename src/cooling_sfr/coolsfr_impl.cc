@@ -384,7 +384,7 @@ void coolsfr::create_star_particle(simparticles *Sp, int i, double prob, double 
           Sp->NumPart++;
 
           STARFORMATION_PRINT("New star is born! id=%d, probability=%g, rand=%g, temp=%g, density=%g, PhysDensThresh=%g\n", 
-            target, prob, rnd, currentTemp, Sp->SphP[target].Density * All.cf_a3inv, All.PhysDensThresh);
+            Sp->SphP[target].ID.get(), prob, rnd, currentTemp, Sp->SphP[target].Density * All.cf_a3inv, All.PhysDensThresh);
         }
     }
 }
