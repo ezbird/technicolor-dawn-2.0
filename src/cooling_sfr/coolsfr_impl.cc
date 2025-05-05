@@ -287,26 +287,6 @@ double coolsfr::get_starformation_rate(int i, double *xcloud, simparticles *Sp)
   if(Sp->SphP[i].SfFlag == 0)
     return 0;
 
-#ifdef H2REGSF
-  t_ff = sqrt((3.0 * M_PI) / (32.0 * (Sp->SphP[i].Density * All.cf_a3inv) * All.G));
-  tsfr = t_ff / H2REG_EFF;
-  cloudmass = Sp->SphP[i].fH2 * Sp->SphP[i].XHI * Sp->SphP[i].nh0 * Sp->P[i].getMass();
-  *xcloud = Sp->SphP[i].fH2;
-#endif
-
-#ifdef H2AUTOSHIELD
-  t_ff = sqrt((3.0 * M_PI) / (32.0 * (Sp->SphP[i].Density * All.cf_a3inv) * All.G));
-  tsfr = t_ff / H2REG_EFF;
-  cloudmass = Sp->SphP[i].fH2 * HYDROGEN_MASSFRAC * Sp->P[i].getMass();
-  *xcloud = Sp->SphP[i].fH2;
-#endif
-
-#ifdef SGREGSF
-  tsfr = sqrt((3.0 * M_PI) / (32.0 * (Sp->SphP[i].Density * All.cf_a3inv) * All.GInternal));
-  cloudmass = Sp->P[i].getMass();
-  *xcloud = 1.0;
-#endif
-
 #if !defined(H2REGSF) && !defined(SGREGSF) && !defined(H2AUTOSHIELD)
   tsfr = sqrt(All.PhysDensThresh / (Sp->SphP[i].Density * All.cf_a3inv)) * All.MaxSfrTimescale;
 
@@ -346,7 +326,7 @@ void coolsfr::create_star_particle(simparticles *Sp, int i, double prob, double 
     {
 
       // CONVERT GAS INTO A STAR
-      if(Sp->P[i].getMass() < 1.5 * All.TargetGasMass / GENERATIONS)
+      if(Sp->P[i].getMass() < 1.5 * All.TargetGasMass / GENERATIONS)  //GENERATIONS 4  /* Number of stars a gas particle may form */
         {
           // Convert the gas particle into a star
           Sp->P[i].setType(4);  // Change type to star
@@ -382,10 +362,11 @@ void coolsfr::create_star_particle(simparticles *Sp, int i, double prob, double 
         #endif
           // Increment particle counter
           Sp->NumPart++;
+      }
 
           STARFORMATION_PRINT("New star is born! id=%d, probability=%g, rand=%g, temp=%g, density=%g, PhysDensThresh=%g\n", 
             Sp->P[i].ID.get(), prob, rnd, currentTemp, Sp->SphP[i].Density * All.cf_a3inv, All.PhysDensThresh);
-        }
+        
     }
 }
 
@@ -547,7 +528,8 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
 }
 
 /**
- * Helper function to get a random number for a given seed
+ * Function to get a random number for a given seed
+ * Returns a random number between 0 and 1
  */
  double coolsfr::get_random_number(int id)
  {

@@ -93,7 +93,7 @@ COOLING                                      # Enables radiative atomic cooling 
 STARFORMATION                                # Enables star formation with the Springel & Hernquist (2003) model
 #DUST
 #SUPERNOVA
-#FEEDBACK
+FEEDBACK
 #WINDS
 
 #---------------------------------------- Single/double precision and data types
