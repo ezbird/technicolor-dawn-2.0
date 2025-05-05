@@ -33,6 +33,10 @@
 
 //#define eV_to_K 11604.505  // Conversion factor from eV to Kelvin
 
+ // Debug output function
+ #define STARFORMATION_PRINT(...) \
+     do { if (All.StarFormationDebug) printf("[STARFORMATION] " __VA_ARGS__); } while (0)
+
 /**
  * Set up units for the star formation code
  */
@@ -273,34 +277,12 @@ double coolsfr::get_starformation_rate(int i, double *xcloud, simparticles *Sp)
   double tsfr, cloudmass;
   gas_state gs = GasState;
 
-#if defined(H2REGSF) || defined(H2AUTOSHIELD)
-  double t_ff;
-#endif
-
-#ifdef SGREGSF
-  double SG_numerator;
-  double SG_alpha;
-#endif
-
 #if !defined(H2REGSF) && !defined(SGREGSF) && !defined(H2AUTOSHIELD)
   double factorEVP, egyhot, ne, tcool, y, x;
   do_cool_data DoCool = DoCoolData;
 #endif
 
   *xcloud = 0.0; /* default: no molecular clouds */
-
-#if defined(H2REGSF) || defined(H2AUTOSHIELD)
-  if(Sp->SphP[i].fH2 > 0.0)
-    Sp->SphP[i].SfFlag = 1;
-#endif
-
-#ifdef SGREGSF
-  SG_numerator = (Sp->SphP[i].v.DivVel * Sp->SphP[i].v.DivVel) + (Sp->SphP[i].r.CurlVel * Sp->SphP[i].r.CurlVel);
-  SG_alpha = SG_beta * SG_numerator / (Sp->SphP[i].Density * All.GInternal);
-
-  if(SG_alpha < 1)
-    Sp->SphP[i].SfFlag = 1;
-#endif
 
   if(Sp->SphP[i].SfFlag == 0)
     return 0;
@@ -357,34 +339,27 @@ double coolsfr::get_starformation_rate(int i, double *xcloud, simparticles *Sp)
 /**
  * Create a star particle from a gas particle
  */
-void coolsfr::create_star_particle(simparticles *Sp, int i, double prob, double rnd)
+void coolsfr::create_star_particle(simparticles *Sp, int i, double prob, double rnd, double currentTemp)
 {
-
-    if(ThisTask == 0)
-    {
-      static int prob_checks = 0;
-      if(prob_checks < 5)
-      {
-        printf("STARFORMATION: prob=%g, rnd=%g, ID=%llu\n", prob, rnd, Sp->P[i].ID.get());
-        prob_checks++;
-      }
-    }
 
   if(rnd < prob)  /* Make a star */
     {
+
+      // CONVERT GAS INTO A STAR
       if(Sp->P[i].getMass() < 1.5 * All.TargetGasMass / GENERATIONS)
         {
           // Convert the gas particle into a star
           Sp->P[i].setType(4);  // Change type to star
       
-#ifdef STELLARAGE
+        #ifdef STELLARAGE
           // Record stellar formation time
           Sp->P[i].StellarAge = All.Time;
-#endif
+        #endif
         }
+
+      // SPAWN A NEW STAR PARTICLE
       else
         {
-          // Spawn a new star particle
           double pmass = Sp->P[i].getMass();
       
           // Make sure we have enough memory
@@ -401,12 +376,15 @@ void coolsfr::create_star_particle(simparticles *Sp, int i, double prob, double 
           Sp->P[j].setMass(All.TargetGasMass / GENERATIONS);
           Sp->P[i].setMass(pmass - Sp->P[j].getMass());
       
-#ifdef STELLARAGE
+        #ifdef STELLARAGE
           // Record stellar formation time
           Sp->P[j].StellarAge = All.Time;
-#endif
+        #endif
           // Increment particle counter
           Sp->NumPart++;
+
+          STARFORMATION_PRINT("New star is born! id=%d, probability=%g, rand=%g, temp=%g, density=%g, PhysDensThresh=%g\n", 
+            target, prob, rnd, currentTemp, Sp->SphP[target].Density * All.cf_a3inv, All.PhysDensThresh);
         }
     }
 }
@@ -452,9 +430,6 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
               if(rho >= All.PhysDensThresh) {
                 Sp->SphP[target].SfFlag = 1;
                 sf_eligible++;
-
-                printf("STARFORMATION - New star eligible! %d, currentTemp=%g, rho=%g, PhysDensThresh=%g\n", 
-                  target, currentTemp, Sp->SphP[target].Density * All.cf_a3inv, All.PhysDensThresh);
               }
             }
             
@@ -542,7 +517,7 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
               double rnd = get_random_number( Sp->P[target].ID.get() + target + All.NumCurrentTiStep );
               
               // Create star if probability check passes
-              create_star_particle(Sp, target, prob, rnd);
+              create_star_particle(Sp, target, prob, rnd, currentTemp);
               
 #ifdef WINDS
               // Handle wind model if particle hasn't been turned into a star

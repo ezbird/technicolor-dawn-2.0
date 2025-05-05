@@ -125,7 +125,7 @@
  #ifdef STARFORMATION
    /* Star formation specific functions */
    double get_starformation_rate(int i, double *xcloud, simparticles *Sp);
-   void create_star_particle(simparticles *Sp, int i, double prob, double rnd);
+   void create_star_particle(simparticles *Sp, int i, double prob, double rnd, double currentTemp);
    double get_random_number(int id);
    void spawn_wind_particle(simparticles *Sp, int i, double cloudmass, double tsfr);
    

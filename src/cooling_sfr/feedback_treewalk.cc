@@ -66,7 +66,7 @@ std::vector<double> g_energy_ratio;
  
  // Debug output function
  #define FEEDBACK_PRINT(...) \
-     do { if (All.FeedbackDebug) printf(__VA_ARGS__); } while (0)
+     do { if (All.FeedbackDebug) printf("[FEEDBACK] " __VA_ARGS__); } while (0)
  
  // Physical constants and conversion factors
  const double HUBBLE_TIME = 13.8e9;              // Hubble time in years (approx)
@@ -157,7 +157,7 @@ std::vector<double> g_energy_ratio;
  
      // Optional cap for stability
      if (!isfinite(w) || w > 10.0 || w < 0.0) {
-         FEEDBACK_PRINT("[Feedback WARNING] Kernel weight w=%.3e clipped for r=%.3e h=%.3e u=%.3e\n", w, r, h, u);
+         FEEDBACK_PRINT("WARNING! Kernel weight w=%.3e clipped for r=%.3e h=%.3e u=%.3e\n", w, r, h, u);
          w = 0.0;
      }
      return w;
@@ -229,12 +229,12 @@ std::vector<double> g_energy_ratio;
      double max_u = 1e4; // Maximum allowed utherm in internal units
  
      if (!isfinite(delta_u) || delta_u < 0.0 || delta_u > 1e10) {
-         FEEDBACK_PRINT("[Feedback WARNING] Non-finite or excessive delta_u=%.3e for gas ID=%llu\n", delta_u, (unsigned long long) gas_id);
+         FEEDBACK_PRINT("WARNING! Non-finite or excessive delta_u=%.3e for gas ID=%llu\n", delta_u, (unsigned long long) gas_id);
          return u_before;
      }
  
      if (u_after > max_u && u_after != max_u) {
-         FEEDBACK_PRINT("[Feedback WARNING] Clamping u from %.3e to %.3e for gas ID=%llu\n", u_after, max_u, (unsigned long long) gas_id);
+         FEEDBACK_PRINT("WARNING! Clamping u from %.3e to %.3e for gas ID=%llu\n", u_after, max_u, (unsigned long long) gas_id);
          return max_u;
      }
  
@@ -449,7 +449,7 @@ std::vector<double> g_energy_ratio;
              total_weight += Targets[i].weight;
              
          if (total_weight <= 0) {
-             FEEDBACK_PRINT("[Feedback WARNING] Total weight <= 0, skipping feedback application\n");
+             FEEDBACK_PRINT("WARNING! Total weight <= 0, skipping feedback application\n");
              return;
          }
          
@@ -477,14 +477,12 @@ std::vector<double> g_energy_ratio;
              double E_therm_j = E_therm * norm_weight;
              double delta_u = E_therm_j * erg_per_mass_to_code * inv_mass_cgs;
              
-
-
-                // accumulate for per‐star energy‐conservation check
-                sum_applied += E_therm_j;
+             // accumulate for per‐star energy‐conservation check
+             sum_applied += E_therm_j;
 
              // Check for valid energy increment
              if (!isfinite(delta_u) || delta_u < 0) {
-                 FEEDBACK_PRINT("[Feedback WARNING] Non-finite delta_u = %.3e for gas %d\n", delta_u, j);
+                 FEEDBACK_PRINT("WARNING! Non-finite delta_u = %.3e for gas %d\n", delta_u, j);
                  continue;
              }
              
@@ -493,7 +491,7 @@ std::vector<double> g_energy_ratio;
              double rel_increase = delta_u / (utherm_before + 1e-10);
              
              if (rel_increase > 10.0) {
-                 FEEDBACK_PRINT("[Feedback WARNING] delta_u (%.3e) is too large (%.1fx u_before=%.3e) for gas ID=%llu\n", 
+                 FEEDBACK_PRINT("WARNING! delta_u (%.3e) is too large (%.1fx u_before=%.3e) for gas ID=%llu\n", 
                                delta_u, rel_increase, utherm_before, (unsigned long long)Sp->P[j].ID.get());
                  continue;
              }
@@ -506,7 +504,7 @@ std::vector<double> g_energy_ratio;
              double v_kick = sqrt(2.0 * E_kin_j * erg_per_mass_to_code * inv_mass_cgs);
              
              if (!isfinite(v_kick) || v_kick < 0 || v_kick > 1e5) {
-                 FEEDBACK_PRINT("[Feedback WARNING] Non-finite or huge v_kick = %.3e for gas %d\n", v_kick, j);
+                 FEEDBACK_PRINT("WARNING! Non-finite or huge v_kick = %.3e for gas %d\n", v_kick, j);
                  continue;
              }
              
@@ -536,7 +534,7 @@ std::vector<double> g_energy_ratio;
              // Final check for numerical stability
              double final_u = Sp->get_utherm_from_entropy(j);
              if (!isfinite(final_u) || final_u < 1e-20 || final_u > 1e10) {
-                 FEEDBACK_PRINT("[Feedback WARNING] Bad final entropy on gas %d: u=%.3e\n", j, final_u);
+                 FEEDBACK_PRINT("WARNING! Bad final entropy on gas %d: u=%.3e\n", j, final_u);
              }
 
             // ─── DIAG: per‐neighbor record ───
@@ -667,10 +665,10 @@ std::vector<double> g_energy_ratio;
     // Print summary (on master process only)
     if (ThisTask == 0 && All.FeedbackDebug && 
        (ThisStepEnergy_SNII > 0 || ThisStepEnergy_SNIa > 0 || ThisStepEnergy_AGB > 0)) {
-        FEEDBACK_PRINT("[Feedback Timestep Summary] E_SNII=%.3e erg, E_SNIa=%.3e erg, E_AGB=%.3e erg\n",
+        FEEDBACK_PRINT("Timestep Summary: E_SNII=%.3e erg, E_SNIa=%.3e erg, E_AGB=%.3e erg\n",
                       ThisStepEnergy_SNII, ThisStepEnergy_SNIa, ThisStepEnergy_AGB);
-        FEEDBACK_PRINT("[Feedback Timestep Summary] Mass Returned=%.3e Msun\n", ThisStepMassReturned);
-        FEEDBACK_PRINT("[Feedback Timestep Summary] Metals (Z=%.3e, C=%.3e, O=%.3e, Fe=%.3e) Msun\n",
+        FEEDBACK_PRINT("Timestep Summary: Mass Returned=%.3e Msun\n", ThisStepMassReturned);
+        FEEDBACK_PRINT("Timestep Summary: Metals (Z=%.3e, C=%.3e, O=%.3e, Fe=%.3e) Msun\n",
                       ThisStepMetalsInjected[0], ThisStepMetalsInjected[1], 
                       ThisStepMetalsInjected[2], ThisStepMetalsInjected[3]);
     }
@@ -696,10 +694,10 @@ std::vector<double> g_energy_ratio;
     
     if (ThisTask == 0) {
         if (n_sources == 0) {
-            FEEDBACK_PRINT("[Feedback] No eligible sources for %s feedback\n", feedback_name);
+            FEEDBACK_PRINT("No eligible sources for %s feedback\n", feedback_name);
             return;
         } else {
-            FEEDBACK_PRINT("[Feedback] Found %d eligible sources for %s feedback\n", n_sources, feedback_name);
+            FEEDBACK_PRINT("Found %d eligible sources for %s feedback\n", n_sources, feedback_name);
         }
     }
 
@@ -727,7 +725,7 @@ std::vector<double> g_energy_ratio;
         
         if (walker->TargetCount == 0) {
             if (ThisTask == 0 && All.FeedbackDebug) {
-                FEEDBACK_PRINT("[Feedback WARNING] No targets found for star %d within h=%.2f for %s feedback\n", 
+                FEEDBACK_PRINT("WARNING! No targets found for star %d within h=%.2f for %s feedback\n", 
                               i, h, feedback_name);
             }
             continue;
