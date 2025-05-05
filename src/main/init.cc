@@ -284,8 +284,13 @@ void sim::init(int RestartSnapNum)
         }
     }
 
-  for(int i = 0; i < Sp.NumGas; i++)
-    Sp.SphP[i].Entropy = std::max<double>(All.MinEgySpec, Sp.SphP[i].Entropy);
+    for(int i = 0; i < Sp.NumGas; i++) {
+      // Convert MinGasTemp to minimum specific energy
+      double mu = (1.0 + 4.0 * HYDROGEN_MASSFRAC) / (1.0 + HYDROGEN_MASSFRAC + Sp.SphP[i].Ne);
+      double min_energy = All.MinGasTemp * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mu);
+      
+      Sp.SphP[i].Entropy = std::max<double>(min_energy, Sp.SphP[i].Entropy);
+  }
 
 #ifdef COOLING
   CoolSfr.IonizeParams();

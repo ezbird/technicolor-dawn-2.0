@@ -66,9 +66,6 @@ void coolsfr::InitCoolMemory()
   if(!gsl_finite(u_old))
     Terminate("invalid input: u_old=%g\n", u_old);
 
-  if(u_old < 0 || rho < 0)
-    Terminate("invalid input: u_old=%g  rho=%g  dt=%g  All.MinEgySpec=%g\n", u_old, rho, dt, All.MinEgySpec);
-
   rho *= All.UnitDensity_in_cgs * All.HubbleParam * All.HubbleParam; /* convert to physical cgs units */
   u_old *= All.UnitPressure_in_cgs / All.UnitDensity_in_cgs;
   dt *= All.UnitTime_in_s / All.HubbleParam;
@@ -855,13 +852,21 @@ void coolsfr::cooling_only(simparticles *Sp) /* normal cooling routine when star
   double dens = Sp->SphP[i].Density;
 
   double dt = (Sp->P[i].getTimeBinHydro() ? (((integertime)1) << Sp->P[i].getTimeBinHydro()) : 0) * All.Timebase_interval;
-
+  
   double dtime = All.cf_atime * dt / All.cf_atime_hubble_a;
-
+  
   double utherm = Sp->get_utherm_from_entropy(i);
+  
+  double ne = Sp->SphP[i].Ne; /* electron abundance (gives ionization state and mean molecular weight) */
+  
+  // Calculate minimum energy from MinGasTemp
+// Calculate minimum energy from MinGasTemp
+double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + ne);
+double min_energy = All.MinGasTemp * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mu);
 
-  double ne      = Sp->SphP[i].Ne; /* electron abundance (gives ionization state and mean molecular weight) */
-  double unew    = DoCooling(std::max<double>(All.MinEgySpec, utherm), dens * All.cf_a3inv, dtime, &ne, gs, DoCool);
+// Use min_energy instead of All.MinEgySpec for the temperature floor
+double unew = DoCooling(std::max<double>(min_energy, utherm), dens * All.cf_a3inv, dtime, &ne, gs, DoCool);
+
   Sp->SphP[i].Ne = ne;
 
   if(unew < 0)
@@ -869,8 +874,12 @@ void coolsfr::cooling_only(simparticles *Sp) /* normal cooling routine when star
 
   double du = unew - utherm;
 
-  if(unew < All.MinEgySpec)
-    du = All.MinEgySpec - utherm;
+  // Convert MinGasTemp to minimum specific energy
+  double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + ne);
+  double min_energy = All.MinGasTemp * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mu);
+
+  if(unew < min_energy)
+      du = min_energy - utherm;
 
   utherm += du;
 

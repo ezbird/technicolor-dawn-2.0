@@ -100,7 +100,6 @@ struct global_data_all_processes : public parameters
   double InitGasTemp;      /**< may be used to set the temperature in the IC's */
   double MinGasTemp;
   double InitGasU;         /**< the same, but converted to thermal energy per unit mass */
-  double MinEgySpec;       /**< the minimum allowed temperature expressed as energy per unit mass */
 
   /* some force counters  */
 
