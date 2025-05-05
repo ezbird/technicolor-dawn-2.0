@@ -817,79 +817,44 @@ void coolsfr::MakeCoolingTable()
 /** \brief Apply the isochoric cooling to all the active gas particles.
  *
  */
-void coolsfr::cooling_only(simparticles *Sp) /* normal cooling routine when star formation is disabled */
-{
-  TIMER_START(CPU_COOLING_SFR);
-  All.set_cosmo_factors_for_current_time();
-
-  gas_state gs        = GasState;
-  do_cool_data DoCool = DoCoolData;
-
-  for(int i = 0; i < Sp->TimeBinsHydro.NActiveParticles; i++)
-    {
-      int target = Sp->TimeBinsHydro.ActiveParticleList[i];
-      if(Sp->P[target].getType() == 0)
-        {
-          if(Sp->P[target].getMass() == 0 && Sp->P[target].ID.get() == 0)
-            continue; /* skip particles that have been swallowed or eliminated */
-
-          cool_sph_particle(Sp, target, &gs, &DoCool);
-        }
-    }
-  TIMER_STOP(CPU_COOLING_SFR);
-}
-
-/** \brief Apply the isochoric cooling to a given gas particle.
- *
- *  This function applies the normal isochoric cooling to a single gas particle.
- *  Once the cooling has been applied according to one of the cooling models implemented,
- *  the internal energy per unit mass, the total energy and the pressure of the particle are updated.
- *
- *  \param i index of the gas particle to which cooling is applied
- */
  void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, const do_cool_data *DoCool)
-{
-  double dens = Sp->SphP[i].Density;
-
-  double dt = (Sp->P[i].getTimeBinHydro() ? (((integertime)1) << Sp->P[i].getTimeBinHydro()) : 0) * All.Timebase_interval;
-  
-  double dtime = All.cf_atime * dt / All.cf_atime_hubble_a;
-  
-  double utherm = Sp->get_utherm_from_entropy(i);
-  
-  double ne = Sp->SphP[i].Ne; /* electron abundance (gives ionization state and mean molecular weight) */
-  
-  // Calculate minimum energy from MinGasTemp
-// Calculate minimum energy from MinGasTemp
-double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + ne);
-double min_energy = All.MinGasTemp * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mu);
-
-// Temperature floor
-double unew = DoCooling(std::max<double>(min_energy, utherm), dens * All.cf_a3inv, dtime, &ne, gs, DoCool);
-
-  Sp->SphP[i].Ne = ne;
-
-  if(unew < 0)
-    Terminate("invalid temperature: i=%d unew=%g\n", i, unew);
-
-  double du = unew - utherm;
-
-  // Convert MinGasTemp to minimum specific energy
-  double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + ne);
-  double min_energy = All.MinGasTemp * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mu);
-
-  if(unew < min_energy)
-      du = min_energy - utherm;
-
-  utherm += du;
-
-#ifdef OUTPUT_COOLHEAT
-  if(dtime > 0)
-    Sp->SphP[i].CoolHeat = du * Sp->P[i].getMass() / dtime;
-#endif
-
-  Sp->set_entropy_from_utherm(utherm, i);
-  Sp->SphP[i].set_thermodynamic_variables();
-}
+ {
+   double dens = Sp->SphP[i].Density;
+ 
+   double dt = (Sp->P[i].getTimeBinHydro() ? (((integertime)1) << Sp->P[i].getTimeBinHydro()) : 0) * All.Timebase_interval;
+ 
+   double dtime = All.cf_atime * dt / All.cf_atime_hubble_a;
+ 
+   double utherm = Sp->get_utherm_from_entropy(i);
+ 
+   double ne = Sp->SphP[i].Ne; /* electron abundance (gives ionization state and mean molecular weight) */
+   
+   // Calculate minimum energy from MinGasTemp
+   double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + ne);
+   double min_energy = All.MinGasTemp * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mu);
+ 
+   // Use min_energy instead of All.MinEgySpec for the temperature floor
+   double unew = DoCooling(std::max<double>(min_energy, utherm), dens * All.cf_a3inv, dtime, &ne, gs, DoCool);
+   Sp->SphP[i].Ne = ne;
+ 
+   if(unew < 0)
+     Terminate("invalid temperature: i=%d unew=%g\n", i, unew);
+ 
+   double du = unew - utherm;
+ 
+   // Apply temperature floor based on MinGasTemp
+   if(unew < min_energy)
+     du = min_energy - utherm;
+ 
+   utherm += du;
+ 
+ #ifdef OUTPUT_COOLHEAT
+   if(dtime > 0)
+     Sp->SphP[i].CoolHeat = du * Sp->P[i].getMass() / dtime;
+ #endif
+ 
+   Sp->set_entropy_from_utherm(utherm, i);
+   Sp->SphP[i].set_thermodynamic_variables();
+ }
 
 #endif
