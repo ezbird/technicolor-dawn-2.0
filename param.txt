@@ -65,23 +65,22 @@ UnitMass_in_g            1.989e43           ;  1.0e10 Msun / h
 UnitVelocity_in_cm_per_s 1e5                ;  1 km/sec
 GravityConstantInternal  0
 
-
 %---- Gravitational softening length (in internal units, e.g., Mpc/h)
-SofteningComovingClass0      0.02     ; gas      = 20 kpc/h
-SofteningComovingClass1      0.05     ; dark matter = 50 kpc/h
+SofteningComovingClass0      0.46875     ; gas     0.02 = 20 kpc/h
+SofteningComovingClass1      0.46875     ; dark matter = 50 kpc/h
 SofteningComovingClass2      0
 SofteningComovingClass3      0
-SofteningComovingClass4      0.01     ; stars    = 10 kpc/h
+SofteningComovingClass4      0.46875     ; stars    = 10 kpc/h
 SofteningComovingClass5      0
-SofteningComovingClass6      0.01     ; dust     = 10 kpc/h
+SofteningComovingClass6      0.46875     ; dust     = 10 kpc/h
 
-SofteningMaxPhysClass0       0.005    ; gas      = 5 kpc
-SofteningMaxPhysClass1       0.01     ; DM       = 10 kpc
+SofteningMaxPhysClass0       0.46875     ; gas      = 5 kpc
+SofteningMaxPhysClass1       0.46875     ; DM       = 10 kpc
 SofteningMaxPhysClass2       0  
 SofteningMaxPhysClass3       0
-SofteningMaxPhysClass4       0.002    ; stars    = 2 kpc
+SofteningMaxPhysClass4       0.46875     ; stars    = 2 kpc
 SofteningMaxPhysClass5       0
-SofteningMaxPhysClass6       0.002    ; dust     = 2 kpc
+SofteningMaxPhysClass6       0.46875     ; dust     = 2 kpc
 
 SofteningClassOfPartType0    0        ; gas
 SofteningClassOfPartType1    1        ; dark matter
@@ -97,23 +96,23 @@ MinimumComovingHydroSoftening 0.001
 
 %----- SPH
 ArtBulkViscConst             1.0
-#MinEgySpec                   0.05      ; took this out completely and replaced with MinGasTemp
+%MinEgySpec                   0.05      ; took this out completely and replaced with MinGasTemp
 MinGasTemp                   50         ; minimum temperature fas is allowed to get
 InitGasTemp                  462.77046  ; in Kelvin, Sets the initial gas temperature, if not provided in the ICs.
 ViscosityAlphaMin            0.2        ; minimum viscosity coefficient 
-MinGasHsml                   1.0e-4     ; we can get negative smoothing lengths without this
+MinGasHsml                   0.1        ; we can get negative smoothing lengths without this lower limit
 
 %----- Star formation
 StarformationMode     1
 MetalYield            0.02
-MaxSfrTimescale       1.5        % usually 1.5; Gas consumption timescale (multi-phase model)
+MaxSfrTimescale       2.7        % usually 1.5; Gas consumption timescale (multi-phase model)
 MaxStarFormationTemp  15000      % only form stars where T < 15000 K
-FactorSN              0.1      % beta, mass fraction of massive stars (multi-phase model)
+FactorSN              0.193      % beta, mass fraction of massive stars (multi-phase model)
 FactorEVP             1000       % A_0, evaporation parameter (multi-phase model); smaller value means lower pressure support, making it easier for gas to collapse
 TempSupernova         1e8        % T_SN, effective "supernova temperature",sets feedback energy (multi-phase model)
 TempClouds            1000       % temperature of cold clouds (multi-phase model)
-CritOverDensity       50        % default is 57.7; overdensity threshold value for cosmological sims; lower value means conditions easier to reach for SF
-CritPhysDensity       0.1          % critical physical density for star formation (in cm^(-3))
+CritOverDensity       100       % default is 57.7; overdensity threshold value for cosmological sims; lower value means conditions easier to reach for SF
+CritPhysDensity       0.1        % critical physical density for star formation (in cm^(-3))
 PhysDensThresh        0.0        % this gets set at runtime in coolsfr::set_units_sfr(void)
 TreecoolFile          data/TREECOOL
 TargetGasMass         1.0e5      # Target gas particle mass in code units
@@ -126,19 +125,19 @@ WindFreeTravelDensFac 0.1
 
 %----- Debugging
 StarFormationDebug  1     % Prints all star formation-related activity (0=off, 1=on)
-FeedbackDebug       0     % Prints all feedback-related activity (0=off, 1=on)
+FeedbackDebug       1     % Prints all feedback-related activity (0=off, 1=on)
 FeedbackSNII        0     % Enable Type II supernova feedback (0=off, 1=on)
 FeedbackSNIa        0     % Enable Type Ia supernova feedback (0=off, 1=on)
-FeedbackAGB         0     % Enable AGB stellar winds feedback (0=off, 1=on)
+FeedbackAGB         1     % Enable AGB stellar winds feedback (0=off, 1=on)
 
 
 %----- Dust properties (PartType6)
-#DustFormationEfficiency 0.1   # 10% of metals turn into dust
-#DustGrowthTimescale 1e7       # Growth timescale in years
-#DustDestructionTimescale 1e8  # Destruction timescale in years
-#DustVelocityScaling 1.0       # Velocity factor for dust
+%DustFormationEfficiency 0.1   # 10% of metals turn into dust
+%DustGrowthTimescale 1e7       # Growth timescale in years
+%DustDestructionTimescale 1e8  # Destruction timescale in years
+%DustVelocityScaling 1.0       # Velocity factor for dust
 
-%----- N-GenIC: Initial conditions -- ONLY DOES DM!
+%----- N-GenIC: Initial conditions -- ONLY SEEMS TO DO DM, but documentation says it should do both!
 %PowerSpectrumFile powerspec_CAMB_Planck2018_logk_logDelta2.txt
 %PowerSpectrumType 2
 %NSample 32              % Normally, choose Nsample such that Ntot = Nsample^3, where Ntot is the total number of particles

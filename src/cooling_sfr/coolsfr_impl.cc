@@ -31,7 +31,7 @@
 #include "../time_integration/timestep.h"
 #include "../cooling_sfr/cooling.h"
 
-#define eV_to_K 11604.505  // Conversion factor from eV to Kelvin
+//#define eV_to_K 11604.505  // Conversion factor from eV to Kelvin
 
 /**
  * Set up units for the star formation code
@@ -154,30 +154,6 @@ void coolsfr::init_clouds(void)
           mpi_printf("COOLSFR: EXPECTED FRACTION OF COLD GAS AT THRESHOLD = %g\n\n", x);
           mpi_printf("COOLSFR: tcool=%g dens=%g egyhot=%g\n", tcool, dens, egyhot);
         }
-
-#ifdef H2REGSF
-      All.PhysDensThresh = (DENSTHRESH/(All.HubbleParam*All.HubbleParam)) * PROTONMASS / (HYDROGEN_MASSFRAC*All.UnitDensity_in_cgs);
-      All.OTUVThresh     = ((DENSTHRESH*OTUVTHRESH)/(All.HubbleParam*All.HubbleParam)) * PROTONMASS / (HYDROGEN_MASSFRAC*All.UnitDensity_in_cgs);
-      
-      double pctocm = 3.085678e18;
-      double gtomsun = 1.989e33;
-      All.SIGMA_NORM = 1./((All.UnitMass_in_g/(All.UnitLength_in_cm*All.UnitLength_in_cm))*((pctocm*pctocm)/gtomsun));
-      
-      double s_to_gyr, G_internalunit, GyrInternal;
-      s_to_gyr = 3.15569e16;
-      G_internalunit = 6.674e-8 * All.UnitMass_in_g/(All.UnitLength_in_cm*All.UnitLength_in_cm*All.UnitLength_in_cm)*(s_to_gyr*s_to_gyr);
-      GyrInternal    = 1./(0.98/All.HubbleParam);
-      All.GInternal  = G_internalunit / (GyrInternal*GyrInternal);
-      
-      if(ThisTask == 0)
-        {
-          mpi_printf("COOLSFR: Setting PhysDensThresh=%g in pressure sfr (system unit) %g h^2 cm^-3\n", All.PhysDensThresh,
-                     All.PhysDensThresh / (PROTONMASS / HYDROGEN_MASSFRAC / All.UnitDensity_in_cgs));
-          mpi_printf("COOLSFR: Setting OTUVThresh=%g (system unit) %g h^2 cm^-3\n", All.OTUVThresh,
-                     All.OTUVThresh / (PROTONMASS / HYDROGEN_MASSFRAC / All.UnitDensity_in_cgs));
-          mpi_printf("COOLSFR: Setting SIGMA_NORM=%g (system unit)\n", All.SIGMA_NORM);
-        }
-#endif
 
 #if defined(SGREGSF) 
       double s_to_gyr, G_internalunit, GyrInternal;
@@ -470,15 +446,15 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
           double rho = Sp->SphP[target].Density * All.cf_a3inv;
           double currentTemp = convert_u_to_temp(utherm, rho, &Sp->SphP[target].Ne, &gs, &DoCool);
 
-          printf("STARFORMATION - Testing whether to make new star: %d, currentTemp=%g, rho=%g, PhysDensThresh=%g\n", 
-            target, currentTemp, Sp->SphP[target].Density * All.cf_a3inv, All.PhysDensThresh);
-
           // Standard density-threshold star formation
           if(currentTemp < All.MaxStarFormationTemp) 
             {
               if(rho >= All.PhysDensThresh) {
                 Sp->SphP[target].SfFlag = 1;
                 sf_eligible++;
+
+                printf("STARFORMATION - New star eligible! %d, currentTemp=%g, rho=%g, PhysDensThresh=%g\n", 
+                  target, currentTemp, Sp->SphP[target].Density * All.cf_a3inv, All.PhysDensThresh);
               }
             }
             
@@ -516,18 +492,6 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
               Sp->SphP[target].Sfr = sfr;
               
               total_sfr += sfr;
-              
-                // DEBUGGING!
-                if(ThisTask == 0)
-                {
-                    static int printed = 0;
-                    if(printed < 5)
-                    {
-                    mpi_printf("STARFORMATION: particle %d, rho=%g, PhysDensThresh=%g, xcloud=%g, sfr=%g\n", 
-                                target, Sp->SphP[target].Density * All.cf_a3inv, All.PhysDensThresh, xcloud, sfr);
-                    printed++;
-                    }
-                }
 
               // Calculate star formation probability
               double tsfr, factorEVP, egyhot, egyeff, egyold, egycurrent;
