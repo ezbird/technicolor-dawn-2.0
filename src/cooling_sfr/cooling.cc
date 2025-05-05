@@ -864,7 +864,7 @@ void coolsfr::cooling_only(simparticles *Sp) /* normal cooling routine when star
 double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + ne);
 double min_energy = All.MinGasTemp * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mu);
 
-// Use min_energy instead of All.MinEgySpec for the temperature floor
+// Temperature floor
 double unew = DoCooling(std::max<double>(min_energy, utherm), dens * All.cf_a3inv, dtime, &ne, gs, DoCool);
 
   Sp->SphP[i].Ne = ne;
