@@ -57,11 +57,11 @@ def main():
     plt.figure()
     
     z1, s1 = process_folder(args.folder1)
-    plt.semilogy(z1, s1, label=os.path.basename(args.folder1))
+    plt.semilogy(z1, s1, label="Gadget-4")
     
     if args.folder2:
         z2, s2 = process_folder(args.folder2)
-        plt.semilogy(z2, s2, label=os.path.basename(args.folder2))
+        plt.semilogy(z2, s2, label="Gadget-3")
     
     plt.gca().invert_xaxis()
     plt.xlabel("Redshift")
