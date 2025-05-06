@@ -610,6 +610,10 @@ void coolsfr::ReadIonizeParams(char *fname)
  */
 void coolsfr::IonizeParamsUVB(void)
 {
+
+  mpi_printf("IonizeParamsUVB is getting called now!");
+
+
   if(!All.ComovingIntegrationOn)
     {
       SetZeroIonization();
