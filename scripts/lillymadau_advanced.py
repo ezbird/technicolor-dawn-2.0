@@ -49,13 +49,7 @@ def read_data_from_snapshot(filename, verbose=False):
             time = header['Time']
             
             # Try different keys for HubbleParam
-            h = 0.7  # default value
-            if 'HubbleParam' in header:
-                h = header['HubbleParam']
-            elif 'h_val' in header:
-                h = header['h_val']
-            elif 'H0' in header:
-                h = header['H0'] / 100.0  # Convert H0 to little h
+            h = 0.6774  # default value
             
             if verbose:
                 print(f"Using HubbleParam = {h}")
