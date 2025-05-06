@@ -189,7 +189,7 @@ def calculate_stellar_mass_density(snapshot_data, verbose=False):
 def process_snapshots(snapshot_dir, hubble_time=13.8e9, verbose=False):
     """Process all snapshots in the given directory."""
     # Find all snapshot files
-    snapshot_pattern = os.path.join(snapshot_dir, "snapshot_*.hdf5")
+    snapshot_pattern = os.path.join(snapshot_dir, "snap*.hdf5")
     snapshot_files = sorted(glob.glob(snapshot_pattern))
     
     if not snapshot_files:
