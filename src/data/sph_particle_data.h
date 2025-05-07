@@ -106,10 +106,10 @@ struct sph_particle_data : public sph_particle_data_hydrocore
   int SfFlag; /*!< flag to indicate whether the particle is currently forming stars */
 #endif
 
-#ifdef COOLING
+
   MyFloat Ne; /*!< free electron fraction, expressed as local electron number density normalized to the hydrogen number density. Gives
                  indirectly mean molecular weight. */
-#endif
+
 
 #ifdef OUTPUT_COOLHEAT
   MyFloat CoolHeat;
