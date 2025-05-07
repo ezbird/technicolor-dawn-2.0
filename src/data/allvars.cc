@@ -115,7 +115,7 @@ void global_data_all_processes::register_parameters(void)
   add_param("InitGasTemp", &InitGasTemp, PARAM_DOUBLE, PARAM_FIXED);
   add_param("MinGasTemp", &MinGasTemp, PARAM_DOUBLE, PARAM_FIXED);
 
-  add_param("TargetGasMass", &TargetGasMass, PARAM_DOUBLE, PARAM_FIXED);
+
 
   for(int i = 0; i < NSOFTCLASSES; i++)
     {
@@ -191,7 +191,8 @@ void global_data_all_processes::register_parameters(void)
   add_param("MaxStarFormationTemp", &MaxStarFormationTemp, PARAM_DOUBLE, PARAM_FIXED);
   add_param("MetalYield", &MetalYield, PARAM_DOUBLE, PARAM_FIXED);
   add_param("StarformationMode", &StarformationMode, PARAM_INT, PARAM_FIXED);
-
+  add_param("TargetGasMass", &TargetGasMass, PARAM_DOUBLE, PARAM_FIXED);
+  
   add_param("WindEfficiency", &WindEfficiency, PARAM_DOUBLE, PARAM_FIXED);
   add_param("WindEnergyFraction", &WindEnergyFraction, PARAM_DOUBLE, PARAM_FIXED);
   add_param("WindFreeTravelLength", &WindFreeTravelLength, PARAM_DOUBLE, PARAM_FIXED);
