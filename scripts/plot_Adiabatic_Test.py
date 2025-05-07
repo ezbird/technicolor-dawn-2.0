@@ -248,4 +248,154 @@ def analyze_snapshot(filename, output_prefix=None, verbose=False):
     return True
 
 def analyze_multiple_snapshots(directory, output_dir=None, verbose=False):
-    """Analyze all snapshots in a directory to track evolution of the adiabatic relation."
+    """Analyze all snapshots in a directory to track evolution of the adiabatic relation."""
+    if output_dir is None:
+        output_dir = "adiabatic_analysis"
+    
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Find all snapshot files
+    snapshot_files = sorted(glob.glob(os.path.join(directory, "snapshot_*.hdf5")))
+    if not snapshot_files:
+        print(f"No snapshot files found in {directory}")
+        return False
+    
+    print(f"Found {len(snapshot_files)} snapshot files")
+    
+    # Lists to store results
+    redshifts = []
+    times = []
+    slopes = []
+    r_squared = []
+    deviation_pct = []
+    
+    # Process each snapshot
+    for filename in snapshot_files:
+        print(f"Processing {filename}...")
+        result = read_snapshot(filename, verbose)
+        if len(result) == 6:
+            density, internal_energy, temperature, ne, redshift, time = result
+        else:
+            print(f"Error reading snapshot {filename}")
+            continue
+        
+        if density is None:
+            continue
+        
+        # Calculate temperature if not directly available
+        if temperature is None and internal_energy is not None:
+            temperature = calculate_temperature(internal_energy, ne, verbose)
+        
+        if temperature is None:
+            print("Unable to determine temperature")
+            continue
+        
+        # Filter out any invalid values
+        mask = (density > 0) & (temperature > 0) & np.isfinite(density) & np.isfinite(temperature)
+        if np.sum(mask) == 0:
+            print("No valid (density, temperature) pairs found")
+            continue
+        
+        density = density[mask]
+        temperature = temperature[mask]
+        
+        # Calculate logarithms
+        log_density = np.log10(density)
+        log_temperature = np.log10(temperature)
+        
+        # Perform linear regression
+        slope, intercept, r_value, p_value, std_err = stats.linregress(log_density, log_temperature)
+        
+        # Expected slope for adiabatic evolution
+        gamma = 5/3  # For monatomic gas
+        expected_slope = gamma - 1  # = 2/3 ≈ 0.667
+        
+        # Store results
+        redshifts.append(redshift)
+        times.append(time)
+        slopes.append(slope)
+        r_squared.append(r_value**2)
+        deviation_pct.append(100*abs(slope-expected_slope)/expected_slope)
+        
+        # Create individual snapshot plot
+        snapshot_prefix = os.path.join(output_dir, os.path.splitext(os.path.basename(filename))[0])
+        analyze_snapshot(filename, snapshot_prefix, verbose)
+    
+    if not redshifts:
+        print("No valid snapshots processed")
+        return False
+    
+    # Sort all results by time (or redshift)
+    sorted_indices = np.argsort(times)
+    redshifts = np.array(redshifts)[sorted_indices]
+    times = np.array(times)[sorted_indices]
+    slopes = np.array(slopes)[sorted_indices]
+    r_squared = np.array(r_squared)[sorted_indices]
+    deviation_pct = np.array(deviation_pct)[sorted_indices]
+    
+    # Create evolution plot
+    plt.figure(figsize=(12, 8))
+    
+    # Plot slope evolution
+    plt.subplot(2, 1, 1)
+    plt.plot(redshifts, slopes, 'bo-', linewidth=2)
+    plt.axhline(y=2/3, color='r', linestyle='--', label='Adiabatic (γ-1 = 2/3)')
+    plt.xlabel('Redshift (z)')
+    plt.ylabel('Slope (γ-1)')
+    plt.title('Evolution of Temperature-Density Relation Slope')
+    plt.grid(True)
+    plt.legend()
+    
+    # Plot deviation percentage
+    plt.subplot(2, 1, 2)
+    plt.plot(redshifts, deviation_pct, 'go-', linewidth=2)
+    plt.xlabel('Redshift (z)')
+    plt.ylabel('Deviation from Adiabatic (%)')
+    plt.title('Deviation from Adiabatic Relation')
+    plt.grid(True)
+    
+    # Save the evolution plot
+    evolution_file = os.path.join(output_dir, "adiabatic_evolution.png")
+    plt.tight_layout()
+    plt.savefig(evolution_file, dpi=300)
+    plt.close()
+    print(f"Evolution plot saved to {evolution_file}")
+    
+    # Save the evolution data
+    data_file = os.path.join(output_dir, "adiabatic_evolution_data.txt")
+    with open(data_file, 'w') as f:
+        f.write("# Evolution of adiabatic relation in snapshots\n")
+        f.write("# Redshift  Time  Slope  R-squared  Deviation(%)\n")
+        for i in range(len(redshifts)):
+            f.write(f"{redshifts[i]:.4f}  {times[i]:.6f}  {slopes[i]:.6f}  {r_squared[i]:.6f}  {deviation_pct[i]:.2f}\n")
+    
+    print(f"Evolution data saved to {data_file}")
+    return True
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Analyze Gadget-4 snapshots for adiabatic behavior')
+    parser.add_argument('--file', help='Analyze a single snapshot file')
+    parser.add_argument('--dir', help='Analyze all snapshots in a directory')
+    parser.add_argument('--output', help='Output directory/prefix for analysis results')
+    parser.add_argument('--verbose', action='store_true', help='Print verbose output')
+    return parser.parse_args()
+
+def main():
+    args = parse_args()
+    
+    if args.file:
+        if os.path.exists(args.file):
+            analyze_snapshot(args.file, args.output, args.verbose)
+        else:
+            print(f"File not found: {args.file}")
+    elif args.dir:
+        if os.path.isdir(args.dir):
+            analyze_multiple_snapshots(args.dir, args.output, args.verbose)
+        else:
+            print(f"Directory not found: {args.dir}")
+    else:
+        print("Please specify either a file (--file) or directory (--dir) to analyze")
+
+if __name__ == "__main__":
+    main()
