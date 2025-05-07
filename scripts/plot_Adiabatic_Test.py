@@ -9,6 +9,12 @@ For an ideal gas with adiabatic index γ, we expect:
     T ∝ ρ^(γ-1)  or  log(T) = (γ-1)log(ρ) + constant
 
 For pure adiabatic evolution, the gas should follow this relation with γ = 5/3 for monatomic gas.
+
+# For a single snapshot (with verbose output for debugging)
+python plot_Adiabatic_Test.py --file ../output/snapshot_030.hdf5 --verbose
+
+# For all snapshots in a directory
+python plot_Adiabatic_Test.py --dir ../output/ --output adiabatic_results
 """
 
 import numpy as np
@@ -222,7 +228,7 @@ def analyze_snapshot(filename, output_prefix=None, verbose=False):
         f"Deviation: {100*abs(slope-expected_slope)/expected_slope:.2f}%"
     )
     
-    plt.annotate(info_text, xy=(0.02, 0.96), xycoords='axes fraction',
+    plt.annotate(info_text, xy=(0.02, 0.92), xycoords='axes fraction',
                 bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.8),
                 va='top', fontsize=9)
     
