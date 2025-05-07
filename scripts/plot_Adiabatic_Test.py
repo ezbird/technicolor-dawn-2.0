@@ -20,64 +20,146 @@ import argparse
 from scipy import stats
 from matplotlib.colors import LogNorm
 
-def read_snapshot(filename):
+def read_snapshot(filename, verbose=False):
     """Read density and temperature data from a Gadget-4 snapshot."""
-    with h5py.File(filename, 'r') as f:
-        # Get header information
-        header = f['Header'].attrs
-        redshift = header['Redshift']
-        time = header['Time']
-        h = header.get('HubbleParam', 0.7)  # Default to 0.7 if not found
-        
-        # Gas properties
-        if 'PartType0' not in f or 'Density' not in f['PartType0']:
-            print(f"No gas particles or density found in {filename}")
-            return None, None, None, None
-        
-        # Get gas density
-        density = f['PartType0/Density'][:]
-        
-        # Get or calculate temperature based on what's available
-        temperature = None
-        if 'Temperature' in f['PartType0']:
-            temperature = f['PartType0/Temperature'][:]
-        elif 'InternalEnergy' in f['PartType0']:
-            # Calculate temperature from internal energy
-            u = f['PartType0/InternalEnergy'][:]
+    try:
+        with h5py.File(filename, 'r') as f:
+            # Print file structure if verbose
+            if verbose:
+                print(f"File structure for {filename}:")
+                for key in f.keys():
+                    print(f" - {key}")
+                    if isinstance(f[key], h5py.Group):
+                        for subkey in f[key].keys():
+                            print(f"   - {subkey}")
+                
+                # Print header attributes
+                if 'Header' in f:
+                    print("Header attributes:")
+                    for key, value in f['Header'].attrs.items():
+                        print(f"  {key}: {value}")
             
-            # Approximate temperature conversion (assuming primordial gas)
-            # T = 2/3 * u * μ * m_p / k_B
-            # where μ is mean molecular weight (≈ 0.6 for ionized gas)
-            mu = 0.6  # mean molecular weight
-            gamma = 5/3  # adiabatic index
-            m_p = 1.67e-24  # proton mass in g
-            k_B = 1.38e-16  # Boltzmann constant in erg/K
+            # Get header information
+            header = f['Header'].attrs
+            redshift = header['Redshift']
+            time = header['Time']
+            h = header.get('HubbleParam', 0.7)  # Default to 0.7 if not found
+            boxsize = header.get('BoxSize', 1.0)
             
-            # Calculate temperature (K)
-            temperature = (gamma - 1) * u * mu * m_p / k_B
-        else:
-            print(f"No temperature or internal energy information found in {filename}")
-            return None, None, None, None
-    
-    return density, temperature, redshift, time
+            # Gas properties
+            if 'PartType0' not in f:
+                print(f"No gas particles found in {filename}")
+                return None, None, None, None, None
+            
+            # Get gas density
+            if 'Density' in f['PartType0']:
+                density = f['PartType0/Density'][:]
+            else:
+                print(f"No density information found in {filename}")
+                return None, None, None, None, None
+            
+            # Get or calculate temperature based on what's available
+            temperature = None
+            internal_energy = None
+            
+            if 'Temperature' in f['PartType0']:
+                temperature = f['PartType0/Temperature'][:]
+                if verbose:
+                    print(f"Found direct temperature data. Range: {np.min(temperature)} - {np.max(temperature)} K")
+            elif 'InternalEnergy' in f['PartType0']:
+                internal_energy = f['PartType0/InternalEnergy'][:]
+                
+                # We'll calculate temperature later based on mean molecular weight
+                if verbose:
+                    print(f"Found internal energy data. Range: {np.min(internal_energy)} - {np.max(internal_energy)}")
+            else:
+                print(f"No temperature or internal energy information found in {filename}")
+                return None, None, None, None, None
+            
+            # Also get electron abundance if available (for mean molecular weight)
+            ne = None
+            if 'ElectronAbundance' in f['PartType0']:
+                ne = f['PartType0/ElectronAbundance'][:]
+                if verbose:
+                    print(f"Found electron abundance data. Range: {np.min(ne)} - {np.max(ne)}")
+            
+            return density, internal_energy, temperature, ne, redshift, time
+    except Exception as e:
+        print(f"Error reading snapshot {filename}: {e}")
+        return None, None, None, None, None, None
 
-def analyze_snapshot(filename, output_prefix=None):
+def calculate_temperature(internal_energy, ne=None, verbose=False):
+    """Calculate temperature from internal energy."""
+    # For primordial gas
+    X_H = 0.76  # Hydrogen mass fraction
+    Y_He = 1.0 - X_H  # Helium mass fraction
+    
+    # Calculate mean molecular weight
+    if ne is not None:
+        # With electron abundance
+        mu = (1.0 + 4.0 * Y_He) / (1.0 + Y_He + ne)
+    else:
+        # Approximate for neutral gas
+        mu = 1.22
+    
+    gamma = 5/3  # adiabatic index
+    m_p = 1.67e-24  # proton mass in g
+    k_B = 1.38e-16  # Boltzmann constant in erg/K
+    
+    # Calculate temperature (K)
+    temperature = (gamma - 1) * internal_energy * mu * m_p / k_B
+    
+    if verbose:
+        print(f"Calculated temperature. Range: {np.min(temperature)} - {np.max(temperature)} K")
+        print(f"Using mu = {mu}")
+    
+    return temperature
+
+def analyze_snapshot(filename, output_prefix=None, verbose=False):
     """Analyze a snapshot for adiabatic behavior and create plots."""
     if output_prefix is None:
         output_prefix = os.path.splitext(os.path.basename(filename))[0]
     
     # Read data
-    density, temperature, redshift, time = read_snapshot(filename)
-    if density is None or temperature is None:
+    result = read_snapshot(filename, verbose)
+    if len(result) == 6:
+        density, internal_energy, temperature, ne, redshift, time = result
+    else:
+        print(f"Error reading snapshot {filename}")
         return False
+    
+    if density is None:
+        return False
+    
+    # Calculate temperature if not directly available
+    if temperature is None and internal_energy is not None:
+        temperature = calculate_temperature(internal_energy, ne, verbose)
+    
+    if temperature is None:
+        print("Unable to determine temperature")
+        return False
+    
+    # Filter out any invalid values
+    mask = (density > 0) & (temperature > 0) & np.isfinite(density) & np.isfinite(temperature)
+    if np.sum(mask) == 0:
+        print("No valid (density, temperature) pairs found")
+        return False
+    
+    density = density[mask]
+    temperature = temperature[mask]
     
     # Calculate logarithms
     log_density = np.log10(density)
     log_temperature = np.log10(temperature)
     
+    # Print statistics
+    if verbose:
+        print(f"Valid data points: {len(log_density)}")
+        print(f"Density range: {10**np.min(log_density):.2e} - {10**np.max(log_density):.2e} g/cm³")
+        print(f"Temperature range: {10**np.min(log_temperature):.2f} - {10**np.max(log_temperature):.2f} K")
+    
     # Perform linear regression to find the slope (which should be γ-1 for adiabatic)
-    mask = np.isfinite(log_density) & np.isfinite(log_temperature)
-    slope, intercept, r_value, p_value, std_err = stats.linregress(log_density[mask], log_temperature[mask])
+    slope, intercept, r_value, p_value, std_err = stats.linregress(log_density, log_temperature)
     
     # Expected slope for adiabatic evolution
     gamma = 5/3  # For monatomic gas
@@ -86,22 +168,36 @@ def analyze_snapshot(filename, output_prefix=None):
     # Create figure
     plt.figure(figsize=(12, 10))
     
-    # Create the 2D histogram plot
-    h, xedges, yedges, img = plt.hist2d(
-        log_density, 
-        log_temperature,
-        bins=100,
-        range=[[-32, -24], [1, 8]],  # Adjust these ranges as needed
-        norm=LogNorm(),
-        cmap='viridis'
-    )
+    # Determine density and temperature ranges for the plot
+    density_min = np.min(log_density)
+    density_max = np.max(log_density)
+    temp_min = np.min(log_temperature)
+    temp_max = np.max(log_temperature)
     
-    # Add colorbar
-    cbar = plt.colorbar()
-    cbar.set_label('Number of Gas Particles')
+    # Add padding
+    density_range = [density_min - 0.5, density_max + 0.5]
+    temp_range = [temp_min - 0.5, temp_max + 0.5]
+    
+    # Create the 2D histogram plot with explicit density and temperature ranges
+    try:
+        h, xedges, yedges = np.histogram2d(
+            log_density, 
+            log_temperature,
+            bins=100,
+            range=[density_range, temp_range]
+        )
+        
+        # Create a proper 2D histogram with pcolormesh to avoid colorbar issues
+        X, Y = np.meshgrid(xedges[:-1], yedges[:-1])
+        plt.pcolormesh(X, Y, h.T, norm=LogNorm(vmin=1), cmap='viridis')
+        plt.colorbar(label='Number of Gas Particles')
+    except Exception as e:
+        print(f"Warning: Could not create 2D histogram: {e}")
+        # Fall back to scatter plot
+        plt.scatter(log_density, log_temperature, s=1, alpha=0.1, c='blue')
     
     # Plot the best-fit line
-    x_vals = np.linspace(min(log_density[mask]), max(log_density[mask]), 100)
+    x_vals = np.linspace(density_min, density_max, 100)
     y_vals = slope * x_vals + intercept
     plt.plot(x_vals, y_vals, 'r-', linewidth=2, label=f'Best fit: slope = {slope:.3f}')
     
@@ -151,132 +247,5 @@ def analyze_snapshot(filename, output_prefix=None):
     print(f"Data saved to {data_file}")
     return True
 
-def analyze_multiple_snapshots(directory, output_dir=None):
-    """Analyze all snapshots in a directory to track evolution of the adiabatic relation."""
-    if output_dir is None:
-        output_dir = "adiabatic_analysis"
-    
-    # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Find all snapshot files
-    snapshot_files = sorted(glob.glob(os.path.join(directory, "snapshot_*.hdf5")))
-    if not snapshot_files:
-        print(f"No snapshot files found in {directory}")
-        return False
-    
-    print(f"Found {len(snapshot_files)} snapshot files")
-    
-    # Lists to store results
-    redshifts = []
-    times = []
-    slopes = []
-    r_squared = []
-    deviation_pct = []
-    
-    # Process each snapshot
-    for filename in snapshot_files:
-        print(f"Processing {filename}...")
-        density, temperature, redshift, time = read_snapshot(filename)
-        if density is None or temperature is None:
-            continue
-        
-        # Calculate logarithms
-        log_density = np.log10(density)
-        log_temperature = np.log10(temperature)
-        
-        # Perform linear regression
-        mask = np.isfinite(log_density) & np.isfinite(log_temperature)
-        slope, intercept, r_value, p_value, std_err = stats.linregress(log_density[mask], log_temperature[mask])
-        
-        # Expected slope for adiabatic evolution
-        gamma = 5/3  # For monatomic gas
-        expected_slope = gamma - 1  # = 2/3 ≈ 0.667
-        
-        # Store results
-        redshifts.append(redshift)
-        times.append(time)
-        slopes.append(slope)
-        r_squared.append(r_value**2)
-        deviation_pct.append(100*abs(slope-expected_slope)/expected_slope)
-        
-        # Create individual snapshot plot
-        snapshot_prefix = os.path.join(output_dir, os.path.splitext(os.path.basename(filename))[0])
-        analyze_snapshot(filename, snapshot_prefix)
-    
-    if not redshifts:
-        print("No valid snapshots processed")
-        return False
-    
-    # Sort all results by time (or redshift)
-    sorted_indices = np.argsort(times)
-    redshifts = np.array(redshifts)[sorted_indices]
-    times = np.array(times)[sorted_indices]
-    slopes = np.array(slopes)[sorted_indices]
-    r_squared = np.array(r_squared)[sorted_indices]
-    deviation_pct = np.array(deviation_pct)[sorted_indices]
-    
-    # Create evolution plot
-    plt.figure(figsize=(12, 8))
-    
-    # Plot slope evolution
-    plt.subplot(2, 1, 1)
-    plt.plot(redshifts, slopes, 'bo-', linewidth=2)
-    plt.axhline(y=2/3, color='r', linestyle='--', label='Adiabatic (γ-1 = 2/3)')
-    plt.xlabel('Redshift (z)')
-    plt.ylabel('Slope (γ-1)')
-    plt.title('Evolution of Temperature-Density Relation Slope')
-    plt.grid(True)
-    plt.legend()
-    
-    # Plot deviation percentage
-    plt.subplot(2, 1, 2)
-    plt.plot(redshifts, deviation_pct, 'go-', linewidth=2)
-    plt.xlabel('Redshift (z)')
-    plt.ylabel('Deviation from Adiabatic (%)')
-    plt.title('Deviation from Adiabatic Relation')
-    plt.grid(True)
-    
-    # Save the evolution plot
-    evolution_file = os.path.join(output_dir, "adiabatic_evolution.png")
-    plt.tight_layout()
-    plt.savefig(evolution_file, dpi=300)
-    plt.close()
-    print(f"Evolution plot saved to {evolution_file}")
-    
-    # Save the evolution data
-    data_file = os.path.join(output_dir, "adiabatic_evolution_data.txt")
-    with open(data_file, 'w') as f:
-        f.write("# Evolution of adiabatic relation in snapshots\n")
-        f.write("# Redshift  Time  Slope  R-squared  Deviation(%)\n")
-        for i in range(len(redshifts)):
-            f.write(f"{redshifts[i]:.4f}  {times[i]:.6f}  {slopes[i]:.6f}  {r_squared[i]:.6f}  {deviation_pct[i]:.2f}\n")
-    
-    print(f"Evolution data saved to {data_file}")
-    return True
-
-def parse_args():
-    parser = argparse.ArgumentParser(description='Analyze Gadget-4 snapshots for adiabatic behavior')
-    parser.add_argument('--file', help='Analyze a single snapshot file')
-    parser.add_argument('--dir', help='Analyze all snapshots in a directory')
-    parser.add_argument('--output', help='Output directory for analysis results')
-    return parser.parse_args()
-
-def main():
-    args = parse_args()
-    
-    if args.file:
-        if os.path.exists(args.file):
-            analyze_snapshot(args.file, args.output)
-        else:
-            print(f"File not found: {args.file}")
-    elif args.dir:
-        if os.path.isdir(args.dir):
-            analyze_multiple_snapshots(args.dir, args.output)
-        else:
-            print(f"Directory not found: {args.dir}")
-    else:
-        print("Please specify either a file (--file) or directory (--dir) to analyze")
-
-if __name__ == "__main__":
-    main()
+def analyze_multiple_snapshots(directory, output_dir=None, verbose=False):
+    """Analyze all snapshots in a directory to track evolution of the adiabatic relation."
