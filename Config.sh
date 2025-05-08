@@ -176,7 +176,7 @@ NGENIC=32                                   # generate cosmological ICs, set NGE
 NGENIC_2LPT                                  # applies 2LPT instead of just Zeldovich approximation
 CREATE_GRID                                  # start with a regular Cartesian DM particle grid, instead of reading a glass file (for NGENIC)
 GENERATE_GAS_IN_ICS                          # add SPH particles to created or read dark matter only ICs
-#SPLIT_PARTICLE_TYPE=4+8                      # specifies particle types to be split if GENERATE_GAS_IN_ICS is activated
+SPLIT_PARTICLE_TYPE=4+8                      # specifies particle types to be split if GENERATE_GAS_IN_ICS is activated
 NGENIC_FIX_MODE_AMPLITUDES                   # when activated, this leaves the mode amplitudes at sqrt(P(k)), instead of sampling from a Rayleigh distribution
 #NGENIC_MIRROR_PHASES                         # if this is activated, all phases are turned by 180 degrees
 #NGENIC_TEST                                  # can be used to create ICs, measure the power spectrum, and then stop
