@@ -4,10 +4,6 @@ Lilly-Madau Plot Generator for Gadget Snapshots
 
 This script analyzes Gadget snapshots to create Lilly-Madau plots for comparing
 cosmic star formation rate density (SFRD) and stellar mass density across different simulations.
-
-Usage:
-  python lilly_madau_comparison.py --sim1 /path/to/gadget3/snapshots/ --sim2 /path/to/gadget4/snapshots/ 
-      --label1 "Gadget-3" --label2 "Gadget-4" --output comparison_plot.png
 """
 
 import numpy as np
@@ -15,7 +11,7 @@ import h5py
 import matplotlib.pyplot as plt
 import glob
 import os
-import re  # Import re module for natural sorting
+import re
 import argparse
 from scipy.interpolate import interp1d
 import matplotlib.gridspec as gridspec
@@ -110,7 +106,7 @@ def read_snapshot_data(snapshot_file, verbose=False):
                         data['particle_count'][f'Type{i}'] = count
             
             # Try to find Hubble parameter in different possible locations
-            data['h'] = get_hubble_param(f)
+            data['h'] = get_hubble_param(f, verbose)
             
             # Get cosmological parameters
             data['omega_b'] = get_cosmological_param(f, 'OmegaBaryon', 0.0455)
@@ -129,6 +125,9 @@ def read_snapshot_data(snapshot_file, verbose=False):
                         if field in f['PartType0']:
                             data['sfr'] = f['PartType0'][field][:]
                             sfr_found = True
+                            if verbose:
+                                print(f"Found SFR field: {field} with shape: {data['sfr'].shape}")
+                                print(f"SFR range: {np.min(data['sfr'])} - {np.max(data['sfr'])}")
                             break
                     
                     if not sfr_found and verbose:
@@ -136,39 +135,49 @@ def read_snapshot_data(snapshot_file, verbose=False):
                         print(f"Available fields in PartType0: {list(f['PartType0'].keys())}")
             
             # Get stellar masses and formation times (star particles, Type 4)
-            if 'PartType4' in f and 'Masses' in f['PartType4']:
+            if 'PartType4' in f and 'Masses' in f['PartType4'] and len(f['PartType4/Masses']) > 0:
                 star_count = len(f['PartType4/Masses'])
-                if star_count > 0:
-                    data['star_masses'] = f['PartType4/Masses'][:]
-                    
-                    # Try different possible names for formation times
-                    time_fields = ['StellarFormationTime', 'FormationTime', 'BirthTime']
-                    birth_time_found = False
-                    
-                    for field in time_fields:
-                        if field in f['PartType4']:
-                            data['star_formation_times'] = f['PartType4'][field][:]
-                            birth_time_found = True
-                            break
-                    
-                    if not birth_time_found and verbose:
-                        print(f"Warning: Could not find formation time field in {snapshot_file}")
-                        print(f"Available fields in PartType4: {list(f['PartType4'].keys())}")
+                data['star_masses'] = f['PartType4/Masses'][:]
+                
+                if verbose:
+                    print(f"Found {star_count} star particles")
+                    print(f"Star mass range: {np.min(data['star_masses'])} - {np.max(data['star_masses'])}")
+                
+                # Try different possible names for formation times
+                time_fields = ['StellarFormationTime', 'FormationTime', 'BirthTime']
+                birth_time_found = False
+                
+                for field in time_fields:
+                    if field in f['PartType4'] and len(f['PartType4'][field]) > 0:
+                        data['star_formation_times'] = f['PartType4'][field][:]
+                        birth_time_found = True
+                        if verbose:
+                            print(f"Found formation time field: {field}")
+                        break
+                
+                if not birth_time_found and verbose:
+                    print(f"Warning: Could not find formation time field in {snapshot_file}")
+                    print(f"Available fields in PartType4: {list(f['PartType4'].keys())}")
             
     except Exception as e:
         print(f"Error reading snapshot {snapshot_file}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
     
     return data
 
-def get_hubble_param(f):
+def get_hubble_param(f, verbose=False):
     """Try to find the Hubble parameter in different possible locations."""
     # Common names for Hubble parameter
     h_names = ['HubbleParam', 'h_val', 'h', 'H0']
     
     # Look in header first
     if 'Header' in f and 'HubbleParam' in f['Header'].attrs:
-        return f['Header'].attrs['HubbleParam']
+        h_val = f['Header'].attrs['HubbleParam']
+        if verbose:
+            print(f"Found HubbleParam in Header: {h_val}")
+        return h_val
     
     # Look in various parameter groups
     param_groups = ['Parameters', 'RunPars', 'Config', 'Constants']
@@ -179,10 +188,14 @@ def get_hubble_param(f):
                     h_val = f[group].attrs[name]
                     # If it's H0 in km/s/Mpc, convert to little h
                     if name == 'H0' and h_val > 10:  # Likely H0 in km/s/Mpc
-                        return h_val / 100.0
+                        h_val = h_val / 100.0
+                    if verbose:
+                        print(f"Found Hubble parameter as {name} in {group}: {h_val}")
                     return h_val
     
     # Default value
+    if verbose:
+        print("Could not find Hubble parameter, using default h=0.7")
     return 0.7  # Most simulations use h=0.7 if not specified
 
 def get_cosmological_param(f, param_name, default_value):
@@ -209,9 +222,19 @@ def calculate_sfr_density(snapshot_data, verbose=False):
         return 0.0
     
     # First method: Use direct SFR from gas particles
-    if snapshot_data['sfr'] is not None:
+    if snapshot_data['sfr'] is not None and len(snapshot_data['sfr']) > 0:
         # Sum all SFRs
-        total_sfr = np.sum(snapshot_data['sfr'])  # Usually in Msun/yr
+        sfr_array = snapshot_data['sfr']
+        
+        # Some simulations may have NaN or inf values
+        sfr_array = sfr_array[np.isfinite(sfr_array)]
+        
+        if len(sfr_array) == 0:
+            if verbose:
+                print("  Warning: All SFR values are non-finite")
+            return 0.0
+        
+        total_sfr = np.sum(sfr_array)  # Usually in Msun/yr
         
         # Get the box volume in comoving (Mpc/h)^3
         box_volume = snapshot_data['boxsize']**3
@@ -219,10 +242,13 @@ def calculate_sfr_density(snapshot_data, verbose=False):
         # Convert to physical units: Msun/yr/Mpc^3
         # Remember to account for h factors correctly
         h = snapshot_data['h']
+        
+        # Check if SFR already includes h-factors
+        # This depends on your simulation, but most Gadget sims store SFR in Msun/yr/h
         sfr_density = total_sfr / box_volume * h**2  # Convert from (Msun/h)/(Mpc/h)^3/yr to Msun/yr/Mpc^3
         
         if verbose:
-            print(f"  Total SFR: {total_sfr} Msun/yr/h")
+            print(f"  Total SFR: {total_sfr} Msun/yr")
             print(f"  Box volume: {box_volume} (Mpc/h)^3")
             print(f"  h value: {h}")
             print(f"  SFR density: {sfr_density} Msun/yr/Mpc^3")
@@ -230,14 +256,60 @@ def calculate_sfr_density(snapshot_data, verbose=False):
         return sfr_density
     
     # Second method (fallback): Try to estimate from star formation history
-    # This is not as accurate but can work if direct SFR is not available
     if snapshot_data['star_masses'] is not None and snapshot_data['star_formation_times'] is not None:
-        # Without specific knowledge of how these are stored, we'd need a more complex implementation
-        # This would require understanding of the time unit and age calculation in the specific simulation
+        # Without specific knowledge of how these are stored, we can make a simple approximation
+        # Assuming formation_times are scale factors (common in Gadget)
+        # Count stars formed in the last ~100 Myr
+        
         if verbose:
-            print("  Warning: Direct SFR not available, estimating from star formation history would require")
-            print("  specific knowledge of the simulation's time units and age calculation.")
-        return 0.0
+            print("  Using star formation history to estimate SFR")
+        
+        # Extract data
+        star_masses = snapshot_data['star_masses']
+        formation_times = snapshot_data['star_formation_times']
+        current_time = snapshot_data['time']
+        
+        # Filter to only include valid values
+        mask = np.isfinite(star_masses) & np.isfinite(formation_times)
+        star_masses = star_masses[mask]
+        formation_times = formation_times[mask]
+        
+        if len(star_masses) == 0:
+            if verbose:
+                print("  Warning: No valid star particles found")
+            return 0.0
+        
+        # In Gadget, formation times are often scale factors (a)
+        # We want stars formed in the last ~100 Myr which is approximately da=0.01 at low z
+        # This is a crude approximation but can give some estimate
+        
+        # For scale factor, larger values are more recent
+        time_window = 0.01  # Adjust based on your simulation
+        recently_formed = formation_times > (current_time - time_window)
+        
+        if np.sum(recently_formed) == 0:
+            if verbose:
+                print("  No recently formed stars found")
+            return 0.0
+        
+        recent_mass = np.sum(star_masses[recently_formed])
+        
+        # Convert to SFR (Msun/yr)
+        # Approximate 100 Myr in years
+        time_window_years = 1.0e8
+        approx_sfr = recent_mass / time_window_years
+        
+        # Convert to SFR density
+        box_volume = snapshot_data['boxsize']**3
+        h = snapshot_data['h']
+        sfr_density = approx_sfr / box_volume * h**2
+        
+        if verbose:
+            print(f"  Recent stellar mass: {recent_mass} Msun/h")
+            print(f"  Approximate SFR: {approx_sfr} Msun/yr")
+            print(f"  SFR density (approx): {sfr_density} Msun/yr/Mpc^3")
+        
+        return sfr_density
     
     return 0.0
 
@@ -249,8 +321,17 @@ def calculate_stellar_mass_density(snapshot_data, verbose=False):
     if snapshot_data is None or snapshot_data['star_masses'] is None:
         return 0.0
     
+    # Filter out any invalid values
+    star_masses = snapshot_data['star_masses']
+    star_masses = star_masses[np.isfinite(star_masses)]
+    
+    if len(star_masses) == 0:
+        if verbose:
+            print("  No valid star particle masses found")
+        return 0.0
+    
     # Sum all stellar masses
-    total_stellar_mass = np.sum(snapshot_data['star_masses'])
+    total_stellar_mass = np.sum(star_masses)
     
     # Get the box volume in comoving (Mpc/h)^3
     box_volume = snapshot_data['boxsize']**3
@@ -352,6 +433,11 @@ def plot_lilly_madau(results1, results2=None, output_file="lilly_madau_plot.png"
     ax1 = plt.subplot(gs[0])  # SFR density
     ax2 = plt.subplot(gs[1])  # Stellar mass density
     
+    # Collect data points for setting axes limits
+    all_redshifts = []
+    all_sfrd = []
+    all_smdens = []
+    
     # Plot observational data
     if show_obs:
         z_obs = np.array(MADAU_DICKINSON_2014['redshift'])
@@ -375,6 +461,11 @@ def plot_lilly_madau(results1, results2=None, output_file="lilly_madau_plot.png"
         # Plot on second panel (Stellar mass density)
         ax2.errorbar(z_obs, smdens_obs, yerr=[smdens_errm, smdens_errp], fmt='o', color='green', 
                     label='Madau & Dickinson (2014)', capsize=3, markersize=4, alpha=0.6)
+        
+        # Add to data for setting axis limits
+        all_redshifts.extend(z_obs)
+        all_sfrd.extend(sfrd_obs)
+        all_smdens.extend(smdens_obs)
     
     # Plot first simulation data
     if results1:
@@ -382,8 +473,25 @@ def plot_lilly_madau(results1, results2=None, output_file="lilly_madau_plot.png"
         sfr_density1 = [item['sfr_density'] for item in results1]
         stellar_density1 = [item['stellar_mass_density'] for item in results1]
         
-        ax1.plot(redshift1, sfr_density1, 'o-', label=sim1_label, color='blue', markersize=6, linewidth=2)
-        ax2.plot(redshift1, stellar_density1, 'o-', label=sim1_label, color='blue', markersize=6, linewidth=2)
+        # Filter out zeros for better plotting
+        valid_indices = [i for i, val in enumerate(sfr_density1) if val > 0]
+        valid_redshift1 = [redshift1[i] for i in valid_indices]
+        valid_sfr1 = [sfr_density1[i] for i in valid_indices]
+        
+        valid_indices = [i for i, val in enumerate(stellar_density1) if val > 0]
+        valid_z_stellar1 = [redshift1[i] for i in valid_indices]
+        valid_stellar1 = [stellar_density1[i] for i in valid_indices]
+        
+        # Plot non-zero values
+        if valid_sfr1:
+            ax1.plot(valid_redshift1, valid_sfr1, 'o-', label=sim1_label, color='blue', markersize=6, linewidth=2)
+            all_redshifts.extend(valid_redshift1)
+            all_sfrd.extend(valid_sfr1)
+        
+        if valid_stellar1:
+            ax2.plot(valid_z_stellar1, valid_stellar1, 'o-', label=sim1_label, color='blue', markersize=6, linewidth=2)
+            all_redshifts.extend(valid_z_stellar1)
+            all_smdens.extend(valid_stellar1)
     
     # Plot second simulation data if provided
     if results2:
@@ -391,8 +499,25 @@ def plot_lilly_madau(results1, results2=None, output_file="lilly_madau_plot.png"
         sfr_density2 = [item['sfr_density'] for item in results2]
         stellar_density2 = [item['stellar_mass_density'] for item in results2]
         
-        ax1.plot(redshift2, sfr_density2, 'o-', label=sim2_label, color='red', markersize=6, linewidth=2)
-        ax2.plot(redshift2, stellar_density2, 'o-', label=sim2_label, color='red', markersize=6, linewidth=2)
+        # Filter out zeros for better plotting
+        valid_indices = [i for i, val in enumerate(sfr_density2) if val > 0]
+        valid_redshift2 = [redshift2[i] for i in valid_indices]
+        valid_sfr2 = [sfr_density2[i] for i in valid_indices]
+        
+        valid_indices = [i for i, val in enumerate(stellar_density2) if val > 0]
+        valid_z_stellar2 = [redshift2[i] for i in valid_indices]
+        valid_stellar2 = [stellar_density2[i] for i in valid_indices]
+        
+        # Plot non-zero values
+        if valid_sfr2:
+            ax1.plot(valid_redshift2, valid_sfr2, 'o-', label=sim2_label, color='red', markersize=6, linewidth=2)
+            all_redshifts.extend(valid_redshift2)
+            all_sfrd.extend(valid_sfr2)
+        
+        if valid_stellar2:
+            ax2.plot(valid_z_stellar2, valid_stellar2, 'o-', label=sim2_label, color='red', markersize=6, linewidth=2)
+            all_redshifts.extend(valid_z_stellar2)
+            all_smdens.extend(valid_stellar2)
     
     # Configure plot 1 (SFR density)
     ax1.set_xlabel('Redshift (z)', fontsize=12)
@@ -410,28 +535,38 @@ def plot_lilly_madau(results1, results2=None, output_file="lilly_madau_plot.png"
     ax2.legend(fontsize=10, loc='upper right')
     ax2.set_title('Cosmic Stellar Mass Density vs. Redshift', fontsize=14)
     
-    # Set common x-range based on simulation data
-    max_z = 10
-    if results1 and results2:
-        # Get common range with some padding
-        min_z = min(min(item['redshift'] for item in results1), 
-                    min(item['redshift'] for item in results2)) - 0.5
-        max_z = max(max(item['redshift'] for item in results1), 
-                    max(item['redshift'] for item in results2)) + 0.5
-    elif results1:
-        min_z = min(item['redshift'] for item in results1) - 0.5
-        max_z = max(item['redshift'] for item in results1) + 0.5
-    elif results2:
-        min_z = min(item['redshift'] for item in results2) - 0.5
-        max_z = max(item['redshift'] for item in results2) + 0.5
+    # Set sensible axis limits based on actual data
+    if all_redshifts:
+        # X-axis (redshift)
+        min_z = max(0, min(all_redshifts) - 0.5)
+        max_z = min(10, max(all_redshifts) + 0.5)
+        
+        ax1.set_xlim(min_z, max_z)
+        ax2.set_xlim(min_z, max_z)
+        
+        # Y-axis (SFR density) - adjust for log scale and include observational range
+        if all_sfrd:
+            min_sfrd = min([s for s in all_sfrd if s > 0]) / 10.0
+            max_sfrd = max(all_sfrd) * 10.0
+            ax1.set_ylim(min_sfrd, max_sfrd)
+        else:
+            # Default from observations if no simulation data
+            ax1.set_ylim(0.001, 0.5)
+        
+        # Y-axis (Stellar mass density) - adjust for log scale
+        if all_smdens:
+            min_smdens = min([s for s in all_smdens if s > 0]) / 10.0
+            max_smdens = max(all_smdens) * 10.0
+            ax2.set_ylim(min_smdens, max_smdens)
+        else:
+            # Default from observations if no simulation data
+            ax2.set_ylim(1e5, 2e8)
     else:
-        min_z = 0
-    
-    # Limit max_z to 10 for better comparison with observations
-    max_z = min(max_z, 10)
-    
-    ax1.set_xlim(min_z, max_z)
-    ax2.set_xlim(min_z, max_z)
+        # Default limits if no data
+        ax1.set_xlim(0, 10)
+        ax2.set_xlim(0, 10)
+        ax1.set_ylim(0.001, 0.5)
+        ax2.set_ylim(1e5, 2e8)
     
     # Add timestamp
     plt.figtext(0.01, 0.01, f"Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 
