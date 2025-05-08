@@ -157,6 +157,7 @@ GridSize                    32
 PowerSpectrumFile           powerspec_CAMB_Planck2018_logk_logDelta2.txt
 PowerSpectrumType           2
 Sigma8                      0.811
+ReNormalizeInputSpectrum    1               % Apply Sigma8 normalization
 PrimordialIndex             0.965
 Seed                        123456
 SphereMode                  0
