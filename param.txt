@@ -163,3 +163,4 @@ Seed                        123456
 SphereMode                  0
 InputSpectrum_UnitLength_in_cm 3.085678e21
 ShapeGamma                  0.21
+UseGasParticles 1
