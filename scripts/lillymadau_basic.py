@@ -33,8 +33,8 @@ def load_sfr_density(folder):
         return np.array([]), np.array([])
 
 # Paths to your two runs:
-folder1 = 'path/to/run1/snapshots'
-folder2 = 'path/to/run2/snapshots'
+folder1 = '~/gadget-3.27/output'
+folder2 = '../output'
 
 z1, rho1 = load_sfr_density(folder1)
 z2, rho2 = load_sfr_density(folder2)
