@@ -13,7 +13,7 @@ OmegaBaryon           0.048            # >0 to **generate gas** as PartType0
 HubbleParam           0.7
 
 %----- N-GenIC: Initial conditions for both DM and gas
-PowerSpectrumFile          powerspec_CAMB_Planck2018_logk_logDelta2.txt
+PowerSpectrumFile          ICs/powerspec_CAMB_Planck2018_logk_logDelta2.txt
 PowerSpectrumType          2
 NSample                    32              % Total particle count will be 2 x Nsample^3 with gas
 GridSize                   32              % Grid for power spectrum
