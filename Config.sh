@@ -91,9 +91,9 @@ TIMEDEP_ART_VISC                             # enables time dependend viscosity 
 
 COOLING                                      # Enables radiative atomic cooling by hydrogen and helium
 STARFORMATION                                # Enables star formation with the Springel & Hernquist (2003) model
-#FEEDBACK
+FEEDBACK
 #DUST
-#WINDS
+WINDS
 
 #---------------------------------------- Single/double precision and data types
 
@@ -172,9 +172,9 @@ OUTPUT_PRESSURE_SPH_DENSITY                  # output also density computed in t
 
 #--------------------------------------- IC creation
  
-#NGENIC=32                                   # generate cosmological ICs, set NGENIC to the FFT grid size used for IC generation
-#NGENIC_2LPT                                  # applies 2LPT instead of just Zeldovich approximation
-#CREATE_GRID                                  # start with a regular Cartesian DM particle grid, instead of reading a glass file (for NGENIC)
+NGENIC=64                                   # generate cosmological ICs, set NGENIC to the FFT grid size used for IC generation
+NGENIC_2LPT                                  # applies 2LPT instead of just Zeldovich approximation
+CREATE_GRID                                  # start with a regular Cartesian DM particle grid, instead of reading a glass file (for NGENIC)
 GENERATE_GAS_IN_ICS                          # add SPH particles to created or read dark matter only ICs
 #SPLIT_PARTICLE_TYPE=4+8                      # specifies particle types to be split if GENERATE_GAS_IN_ICS is activated
 #NGENIC_FIX_MODE_AMPLITUDES                   # when activated, this leaves the mode amplitudes at sqrt(P(k)), instead of sampling from a Rayleigh distribution

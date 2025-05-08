@@ -31,7 +31,7 @@ OmegaLambda               0.6911
 OmegaBaryon               0.0486
 HubbleParam               0.6774
 Hubble                    0.1
-BoxSize                   100          %  in kpc
+BoxSize                   1000          %  in kpc
 
 %---- Output frequency and output paramaters
 OutputListOn              0
@@ -151,14 +151,14 @@ FeedbackAGB         1     % Enable AGB stellar winds feedback (0=off, 1=on)
 %ShapeGamma 0.25
 
 %---- NGENIC Parameters (used ONLY when compiled with NGENIC)
-%NSample                     32             % Grid size - set same as NGENIC in Config.sh
-%GridSize                    32
-%PowerSpectrumFile           ICs/fixed_power_spectrum.txt
-%PowerSpectrumType           1
-%Sigma8                      0.811
-%ReNormalizeInputSpectrum    1               % Apply Sigma8 normalization
-%PrimordialIndex             0.965
-%Seed                        123456
-%SphereMode                  0
-%InputSpectrum_UnitLength_in_cm 3.085678e21
-%ShapeGamma                  0.21
+NSample                     64             % Grid size - set same as NGENIC in Config.sh
+GridSize                    64
+PowerSpectrumFile           empty.txt      % ICs/fixed_power_spectrum.txt
+PowerSpectrumType           1
+Sigma8                      0.811
+ReNormalizeInputSpectrum    1               % Apply Sigma8 normalization
+PrimordialIndex             0.965
+Seed                        123456
+SphereMode                  0
+InputSpectrum_UnitLength_in_cm 3.085678e21
+ShapeGamma                  0.21
