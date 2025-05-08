@@ -25,4 +25,4 @@ Redshift                   127             % Starting redshift
 Box                        5.0             % Box size in Mpc/h
 
 % Required for NGenIC
-PeriodicBox                1               % Required for cosmological ICs
+PeriodicBox                1               % Required for cosmological ICs 
