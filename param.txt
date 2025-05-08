@@ -154,7 +154,7 @@ MinGasHsml                   0.1        ; we can get negative smoothing lengths 
 %---- NGENIC Parameters (used ONLY when compiled with NGENIC)
 NSample                     32             % Grid size - set same as NGENIC in Config.sh
 GridSize                    32
-%PowerSpectrumFile           ICs/powerspec_CAMB_Planck2018_logk_logDelta2_converted.dat
+PowerSpectrumFile           ICs/gadget4_ps.txt
 PowerSpectrumType           2
 Sigma8                      0.811
 ReNormalizeInputSpectrum    1               % Apply Sigma8 normalization
