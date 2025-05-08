@@ -435,7 +435,7 @@ def analyze_snapshot(filename, output_prefix="cooling_test"):
     
     # Add colorbar and labels
     cbar = plt.colorbar(contour, ax=ax)
-    cbar.set_label(r'log$_{10}(t_{cool}/t_{dyn}'))
+    cbar.set_label(r'log$_{10}(t_{cool}/t_{dyn}')
     ax.set_xlabel(r'log$_{10}(\rho)$ [code units]')
     ax.set_ylabel(r'log$_{10}(T)$ [K]')
     ax.set_title(f'Cooling Threshold Map (z={redshift:.2f})')
