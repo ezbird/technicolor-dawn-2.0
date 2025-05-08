@@ -118,17 +118,17 @@ TreecoolFile          data/TREECOOL
 TargetGasMass         1.0e5      # Target gas particle mass in code units
 
 % ---- Wind
-%WindEfficiency        2.0
-%WindEnergyFraction    1.0
-%WindFreeTravelLength  20
-%WindFreeTravelDensFac 0.1
+WindEfficiency        2.0
+WindEnergyFraction    1.0
+WindFreeTravelLength  20
+WindFreeTravelDensFac 0.1
 
 %----- Debugging
 StarFormationDebug  1     % Prints all star formation-related activity (0=off, 1=on)
-%FeedbackDebug       1     % Prints all feedback-related activity (0=off, 1=on)
-%FeedbackSNII        0     % Enable Type II supernova feedback (0=off, 1=on)
-%FeedbackSNIa        0     % Enable Type Ia supernova feedback (0=off, 1=on)
-%FeedbackAGB         1     % Enable AGB stellar winds feedback (0=off, 1=on)
+FeedbackDebug       1     % Prints all feedback-related activity (0=off, 1=on)
+FeedbackSNII        0     % Enable Type II supernova feedback (0=off, 1=on)
+FeedbackSNIa        0     % Enable Type Ia supernova feedback (0=off, 1=on)
+FeedbackAGB         1     % Enable AGB stellar winds feedback (0=off, 1=on)
 
 
 %----- Dust properties (PartType6)
