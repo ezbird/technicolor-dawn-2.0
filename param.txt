@@ -2,7 +2,7 @@
 % NOTE: new parameters must be updated in allvars.cc and allvars.h
 
 %----  Relevant files 
-InitCondFile         empty.txt     %ICs/IC_gadget4_32_100kpc
+InitCondFile         ICs/snapshot_ics_000
 OutputDir            ./output
 SnapshotFileBase     snapshot
 OutputListFilename   empty.txt
