@@ -150,3 +150,15 @@ MinGasHsml                   0.1        ; we can get negative smoothing lengths 
 %InputSpectrum_UnitLength_in_cm 3.085678e24     % may need to confirm this!
 %ShapeGamma 0.25
 %UseGasParticles 1
+
+%---- NGENIC Parameters (used ONLY when compiled with NGENIC)
+NSample                     32             % Grid size - set same as NGENIC in Config.sh
+GridSize                    32
+PowerSpectrumFile           powerspec_CAMB_Planck2018_logk_logDelta2.txt
+PowerSpectrumType           2
+Sigma8                      0.811
+PrimordialIndex             0.965
+Seed                        123456
+SphereMode                  0
+InputSpectrum_UnitLength_in_cm 3.085678e21
+ShapeGamma                  0.21
