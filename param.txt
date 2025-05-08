@@ -2,7 +2,7 @@
 % NOTE: new parameters must be updated in allvars.cc and allvars.h
 
 %----  Relevant files 
-InitCondFile         ICs/snapshot_ics_000
+InitCondFile         ICs/ngenic_64_1000kpc
 OutputDir            ./output
 SnapshotFileBase     snapshot
 OutputListFilename   empty.txt
@@ -137,28 +137,15 @@ FeedbackAGB         1     % Enable AGB stellar winds feedback (0=off, 1=on)
 %DustDestructionTimescale 1e8  # Destruction timescale in years
 %DustVelocityScaling 1.0       # Velocity factor for dust
 
-%----- N-GenIC: Initial conditions -- ONLY SEEMS TO DO DM, but documentation says it should do both!
-%PowerSpectrumFile powerspec_CAMB_Planck2018_logk_logDelta2.txt
-%PowerSpectrumType 2
-%NSample 32              % Normally, choose Nsample such that Ntot = Nsample^3, where Ntot is the total number of particles
-%GridSize 32
-%PrimordialIndex 1.0
-%Sigma8 0.811    % 0.811
-%ReNormalizeInputSpectrum 1
-%SphereMode 0
-%Seed 123456
-%InputSpectrum_UnitLength_in_cm 3.085678e24     % may need to confirm this!
-%ShapeGamma 0.25
-
 %---- NGENIC Parameters (used ONLY when compiled with NGENIC)
-NSample                     64             % Grid size - set same as NGENIC in Config.sh
-GridSize                    64
-PowerSpectrumFile           empty.txt      % ICs/fixed_power_spectrum.txt
-PowerSpectrumType           1
-Sigma8                      0.811
-ReNormalizeInputSpectrum    1               % Apply Sigma8 normalization
-PrimordialIndex             0.965
-Seed                        123456
-SphereMode                  0
-InputSpectrum_UnitLength_in_cm 3.085678e21
-ShapeGamma                  0.21
+%NSample                     64             % Grid size - set same as NGENIC in Config.sh
+%GridSize                    64
+%PowerSpectrumFile           empty.txt      % ICs/fixed_power_spectrum.txt
+%PowerSpectrumType           1
+%Sigma8                      0.811
+%ReNormalizeInputSpectrum    1               % Apply Sigma8 normalization
+%PrimordialIndex             0.965
+%Seed                        123456
+%SphereMode                  0
+%InputSpectrum_UnitLength_in_cm 3.085678e21
+%ShapeGamma                  0.21
