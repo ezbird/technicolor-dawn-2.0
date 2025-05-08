@@ -19,7 +19,7 @@ def get_sfr_density(snapshot_file):
     return redshift, sfr_density
 
 def load_sfr_density(folder):
-    files = sorted(glob.glob(os.path.join(folder, 'snapshot_*.hdf5')))
+    files = sorted(glob.glob(os.path.join(folder, 'snap*.hdf5')))
     data = []
     for f in files:
         try:
