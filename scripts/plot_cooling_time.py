@@ -20,27 +20,32 @@ def calculate_cooling_function(T, ne_fraction=1.0):
     Based on Sutherland & Dopita (1993) for primordial composition.
     
     Args:
-        T: Temperature in Kelvin
+        T: Temperature in Kelvin (can be a NumPy array)
         ne_fraction: electron fraction relative to hydrogen number density
     
     Returns:
         Cooling rate in erg cm³ s⁻¹
     """
-    # Simple piecewise approximation of cooling curve for primordial gas
+    # Convert to NumPy array if it's not already
+    T = np.asarray(T)
     log_T = np.log10(T)
     
-    if log_T < 4.0:
-        # Low-temperature regime (mostly molecular cooling)
-        return 1e-24 * np.sqrt(T)
-    elif log_T < 5.5:
-        # Peak of cooling curve around 10^4-10^5 K (mostly atomic cooling)
-        return 1e-22 * np.power(T/1e4, -1.5)
-    elif log_T < 7.5:
-        # High-temperature regime (mostly free-free)
-        return 2e-23 * np.sqrt(T)
-    else:
-        # Very high temperature
-        return 5e-23 * np.sqrt(T)
+    # Define conditions and corresponding functions
+    condlist = [
+        log_T < 4.0,
+        (log_T >= 4.0) & (log_T < 5.5),
+        (log_T >= 5.5) & (log_T < 7.5),
+        log_T >= 7.5
+    ]
+    
+    funclist = [
+        lambda t: 1e-24 * np.sqrt(t),
+        lambda t: 1e-22 * np.power(t/1e4, -1.5),
+        lambda t: 2e-23 * np.sqrt(t),
+        lambda t: 5e-23 * np.sqrt(t)
+    ]
+    
+    return np.piecewise(T, condlist, funclist)
 
 def cooling_time(u, rho, mu=0.6, gamma=5/3, cooling_func=None):
     """
