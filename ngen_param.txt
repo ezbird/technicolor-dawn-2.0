@@ -1,0 +1,28 @@
+%----- N-GenIC: Initial conditions for both DM and gas
+PowerSpectrumFile          powerspec_CAMB_Planck2018_logk_logDelta2.txt
+PowerSpectrumType          2
+NSample                    32              % Total particle count will be 2 x Nsample^3 with gas
+GridSize                   32              % Grid for power spectrum
+PrimordialIndex            1.0
+Sigma8                     0.811           % Normalization of power spectrum
+ReNormalizeInputSpectrum   1               % Apply Sigma8 normalization
+SphereMode                 0               % 0 for periodic box
+Seed                       123456          % Random seed
+InputSpectrum_UnitLength_in_cm 3.085678e24 % 1 Mpc in cm
+ShapeGamma                 0.25
+UseGasParticles            1               % 1 to include gas particles
+
+% Important gas-specific parameters
+OmegaBaryon                0.0486          % Baryon density (Planck 2018)
+GasTemp                    100.0           % Initial gas temperature in K
+InitCondFile               ./ics_with_gas  % Output filename
+
+% Cosmological parameters
+Omega0                     0.3111          % Total matter density (Planck 2018)
+OmegaLambda                0.6889          % Dark energy density
+HubbleParam                0.6766          % Hubble parameter h
+Redshift                   127             % Starting redshift
+Box                        5.0             % Box size in Mpc/h
+
+% Required for NGenIC
+PeriodicBox                1               % Required for cosmological ICs
