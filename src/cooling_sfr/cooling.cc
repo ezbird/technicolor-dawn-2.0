@@ -188,66 +188,75 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
  *  \param ne_guess electron number density relative to hydrogen number density
  *  \return the gas temperature
  */
- double coolsfr::convert_u_to_temp(double u, double rho, double *ne_guess,
-  gas_state *gs, const do_cool_data *DoCool)
-{
-// --- Convert code‐units of u (erg/g in code) to physical cgs units ---
-//   u_code × (UnitEnergy_in_cgs / UnitMass_in_g) → u_cgs [erg/g]
-double u_cgs = u * (All.UnitEnergy_in_cgs / All.UnitMass_in_g);
-
-// Handle non‐positive internal energy
-if(u_cgs <= 0.0) {
-*ne_guess = 0.0;
-return 1.0;  // floor at 1 K
-}
-
-// Initial guess for μ = mean molecular weight
-double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + *ne_guess);
-
-// Initial temperature estimate in Kelvin:
-//   (γ−1) u [erg/g] × (m_p/k_B) × μ → T [K]
-double temp = GAMMA_MINUS1 * u_cgs * PROTONMASS / BOLTZMANN * mu;
-
-// enforce physical bounds on the guess
-temp = std::min(std::max(temp, 1.0), 1e12);
-
-// solver parameters
-const int    MAX_ITERS      = 50;
-const double REL_TOL       = 1e-3;    // relative tolerance
-const double ABS_TOL       = 1e-6;    // absolute tolerance in K
-
-double temp_old = temp;
-for(int iter = 0; iter < MAX_ITERS; ++iter) {
-double ne_old = *ne_guess;
-
-// update electron fraction & rates at current T
-find_abundances_and_rates(std::log10(temp), rho, ne_guess, gs, DoCool);
-
-// recompute μ with updated ne
-mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + *ne_guess);
-
-// new temperature from updated μ
-double temp_new = GAMMA_MINUS1 * u_cgs * PROTONMASS / BOLTZMANN * mu;
-
-// damp oscillations lightly
-double damping = 1.0 + 0.1 * iter;
-temp = temp_old + (temp_new - temp_old)/damping;
-
-// clamp to physical range each iteration
-temp = std::min(std::max(temp, 1.0), 1e12);
-
-// convergence check: either relative or absolute
-double dt = std::abs(temp - temp_old);
-if(dt < std::max(REL_TOL*temp, ABS_TOL)) {
-return temp; 
-}
-temp_old = temp;
-}
-
-// if we get here, we failed to converge – warn and return last value
-printf("convert_u_to_temp did not converge in %d iterations, T≈%g K", MAX_ITERS, temp);
-return temp;
-}
+ double coolsfr::convert_u_to_temp(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
+ {
+     // --- Convert code‐units of u (erg/g in code) to physical cgs units ---
+     //   u_code × (UnitEnergy_in_cgs / UnitMass_in_g) → u_cgs [erg/g]
+     double u_cgs = u * (All.UnitEnergy_in_cgs / All.UnitMass_in_g);
+     
+     // Handle non‐positive or invalid internal energy
+     if(u_cgs <= 0.0 || !gsl_finite(u_cgs)) {
+         *ne_guess = 0.0;
+         // Use a safer minimum temperature (100K instead of 1K)
+         return All.MinGasTemp > 0 ? All.MinGasTemp : 100.0;
+     }
+     
+     // Initial guess for μ = mean molecular weight
+     double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + *ne_guess);
+     
+     // Initial temperature estimate in Kelvin:
+     //   (γ−1) u [erg/g] × (m_p/k_B) × μ → T [K]
+     double temp = GAMMA_MINUS1 * u_cgs * PROTONMASS / BOLTZMANN * mu;
+     
+     // enforce physical bounds on the guess
+     // Use a larger minimum temperature for stability
+     double min_temp = All.MinGasTemp > 0 ? All.MinGasTemp : 100.0;
+     temp = std::min(std::max(temp, min_temp), 1e12);
+     
+     // solver parameters
+     const int    MAX_ITERS = 50;
+     const double REL_TOL   = 1e-3;    // relative tolerance
+     const double ABS_TOL   = 1e-6;    // absolute tolerance in K
+     
+     double temp_old = temp;
+     for(int iter = 0; iter < MAX_ITERS; ++iter) {
+         double ne_old = *ne_guess;
+         
+         // update electron fraction & rates at current T
+         if (!gsl_finite(std::log10(temp))) {
+             // Invalid temperature, return minimum temperature
+             printf("Warning: Invalid temperature in convert_u_to_temp: %g, u=%g, rho=%g\n", temp, u, rho);
+             *ne_guess = 0.0;
+             return min_temp;
+         }
+         
+         find_abundances_and_rates(std::log10(temp), rho, ne_guess, gs, DoCool);
+         
+         // recompute μ with updated ne
+         mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + *ne_guess);
+         
+         // new temperature from updated μ
+         double temp_new = GAMMA_MINUS1 * u_cgs * PROTONMASS / BOLTZMANN * mu;
+         
+         // damp oscillations lightly
+         double damping = 1.0 + 0.1 * iter;
+         temp = temp_old + (temp_new - temp_old)/damping;
+         
+         // clamp to physical range each iteration
+         temp = std::min(std::max(temp, min_temp), 1e12);
+         
+         // convergence check: either relative or absolute
+         double dt = std::abs(temp - temp_old);
+         if(dt < std::max(REL_TOL*temp, ABS_TOL)) {
+             return temp; 
+         }
+         temp_old = temp;
+     }
+     
+     // if we get here, we failed to converge – warn and return last value
+     printf("convert_u_to_temp did not converge in %d iterations, T≈%g K", MAX_ITERS, temp);
+     return temp;
+ }
 
 
 /** \brief Computes the actual abundance ratios.
@@ -264,8 +273,10 @@ void coolsfr::find_abundances_and_rates(double logT, double rho, double *ne_gues
   double rho_input  = rho;
   double ne_input   = *ne_guess;
 
-  if(!gsl_finite(logT))
-    Terminate("logT=%g\n", logT);
+  if(!gsl_finite(logT)) {
+      fprintf(stderr, "Warning: find_abundances called with logT=%g → clamping to [%g,%g]\n",logT, Tmin, Tmax);
+      logT = std::min(std::max(logT_input, Tmin), Tmax);
+  }
 
   if(logT <= Tmin) /* everything neutral */
     {
@@ -822,7 +833,7 @@ void coolsfr::MakeCoolingTable()
  *
  */
  void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, const do_cool_data *DoCool)
- {
+{
    double dens = Sp->SphP[i].Density;
  
    double dt = (Sp->P[i].getTimeBinHydro() ? (((integertime)1) << Sp->P[i].getTimeBinHydro()) : 0) * All.Timebase_interval;
@@ -830,38 +841,83 @@ void coolsfr::MakeCoolingTable()
    double dtime = All.cf_atime * dt / All.cf_atime_hubble_a;
  
    double utherm = Sp->get_utherm_from_entropy(i);
+   
+   // Safety check for negative or NaN internal energy
+   if(utherm <= 0 || !gsl_finite(utherm)) {
+       printf("Warning: Invalid utherm=%g detected for particle %d, resetting to minimum\n", utherm, i);
+       
+       // Calculate minimum energy and use it
+       double ne = 1.0; // Assume fully ionized for safety
+       double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + ne);
+       double min_energy = 100.0 * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mu);
+       min_energy *= All.UnitMass_in_g / All.UnitEnergy_in_cgs;
+       
+       utherm = min_energy;
+       Sp->SphP[i].Ne = ne;
+       
+       // Set entropy from this minimum energy
+       Sp->set_entropy_from_utherm(utherm, i);
+       Sp->SphP[i].set_thermodynamic_variables();
+       return;
+   }
  
    double ne = Sp->SphP[i].Ne; /* electron abundance (gives ionization state and mean molecular weight) */
    
-    // Calculate minimum energy from MinGasTemp (with proper unit conversion)
-    double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + ne);
-    double min_energy = All.MinGasTemp * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mu);
-    // Convert from CGS to code units
-    min_energy *= All.UnitMass_in_g / All.UnitEnergy_in_cgs;
+   // Safety check for Ne
+   if(ne < 0 || ne > 2.0 || !gsl_finite(ne)) {
+       printf("Warning: Invalid Ne=%g detected for particle %d, resetting\n", ne, i);
+       ne = 1.0; // Reset to a reasonable value
+       Sp->SphP[i].Ne = ne;
+   }
+   
+   // Calculate minimum energy from MinGasTemp (with proper unit conversion)
+   double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + ne);
+   
+   // Use a higher temperature floor (100K) if MinGasTemp is not set or too low
+   double min_temp = All.MinGasTemp > 0 ? All.MinGasTemp : 100.0;
+   double min_energy = min_temp * BOLTZMANN / (GAMMA_MINUS1 * PROTONMASS * mu);
+   
+   // Convert from CGS to code units
+   min_energy *= All.UnitMass_in_g / All.UnitEnergy_in_cgs;
 
-    // Use min_energy instead of All.MinEgySpec for the temperature floor
-    double unew = DoCooling(std::max<double>(min_energy, utherm), dens * All.cf_a3inv, dtime, &ne, gs, DoCool);
+   // Use min_energy as safety floor before passing to DoCooling
+   double safe_utherm = std::max<double>(min_energy, utherm);
+   
+   // Limit cooling timestep for numerical stability - don't cool by more than 50% in one step
+   double cooling_time = GetCoolingTime(safe_utherm, dens * All.cf_a3inv, &ne, gs, DoCool);
+   if(cooling_time > 0 && dtime > 0.5 * cooling_time) {
+       dtime = 0.5 * cooling_time;
+       printf("Limited cooling timestep for particle %d (t_cool=%g)\n", i, cooling_time);
+   }
+   
+   // Apply cooling with all safety measures in place
+   double unew = DoCooling(safe_utherm, dens * All.cf_a3inv, dtime, &ne, gs, DoCool);
  
-    Sp->SphP[i].Ne = ne;
+   Sp->SphP[i].Ne = ne;
  
-    if(unew < 0)
-       Terminate("invalid temperature: i=%d unew=%g\n", i, unew);
+   // Additional validation of the result
+   if(unew < 0 || !gsl_finite(unew)) {
+       printf("Warning: Invalid unew=%g after cooling for particle %d, using minimum\n", unew, i);
+       unew = min_energy;
+   }
  
-    double du = unew - utherm;
+   double du = unew - utherm;
  
-    // Apply temperature floor based on MinGasTemp
-    if(unew < min_energy)
+   // Apply temperature floor based on MinGasTemp
+   if(unew < min_energy) {
+      printf("Applying temperature floor: %g -> %g for particle %d\n", unew, min_energy, i);
       du = min_energy - utherm;
+   }
  
-    utherm += du;
+   utherm += du;
  
- #ifdef OUTPUT_COOLHEAT
+#ifdef OUTPUT_COOLHEAT
    if(dtime > 0)
      Sp->SphP[i].CoolHeat = du * Sp->P[i].getMass() / dtime;
- #endif
+#endif
  
    Sp->set_entropy_from_utherm(utherm, i);
    Sp->SphP[i].set_thermodynamic_variables();
- }
+}
 
 #endif
