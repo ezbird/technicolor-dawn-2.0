@@ -44,8 +44,8 @@ MaxFilesWithConcurrentIO  1
 
 %---- Accuracy of time integration
 ErrTolIntAccuracy        0.02 
-CourantFac               0.15
-MaxSizeTimestep          0.05
+CourantFac               0.1
+MaxSizeTimestep          0.01
 MinSizeTimestep          1e-07
 
 %---- Tree algorithm, force accuracy, domain update frequency
@@ -102,15 +102,15 @@ MinimumComovingHydroSoftening 0.001
 %----- SPH
 ArtBulkViscConst             1.5        ; Higher for better shock handling
 %MinEgySpec                   0.05      ; took this out completely and replaced with MinGasTemp
-MinGasTemp                   50         ; in Kelvin, minimum temperature fas is allowed to get
+MinGasTemp                   75         ; in Kelvin, minimum temperature fas is allowed to get
 InitGasTemp                  462.77046  ; in Kelvin, Sets the initial gas temperature, if not provided in the ICs.
-ViscosityAlphaMin            0.2        ; minimum viscosity coefficient 
+ViscosityAlphaMin            0.1        ; minimum viscosity coefficient 
 MinGasHsml                   0.1        ; we can get negative smoothing lengths without this lower limit
 
 %---- Velocity Limiter Parameters
 LimitExtremeVelocities     1       % Whether to limit extreme particle velocities (0=no, 1=yes)
 LimitVelocitiesOnlyForGas  1       % Whether to limit velocities only for gas particles (0=no, 1=yes)
-MaxAllowedVelocity         1000.0   % Maximum allowed velocity in code units
+MaxAllowedVelocity         750.0   % Maximum allowed velocity in code units
 
 % ---- Wind
 WindEfficiency        2.0
