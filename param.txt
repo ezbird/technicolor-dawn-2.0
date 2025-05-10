@@ -97,19 +97,19 @@ SofteningClassOfPartType6    6        ; dust
 
 GasSoftFactor 1.5
 AdaptiveHydroSofteningSpacing 1.05
-MinimumComovingHydroSoftening 0.001
+MinimumComovingHydroSoftening 0.1
 
 %----- SPH
 ArtBulkViscConst             1.5        ; Higher for better shock handling
 %MinEgySpec                   0.05      ; took this out completely and replaced with MinGasTemp
-MinGasTemp                   50         ; in Kelvin, minimum temperature fas is allowed to get
+MinGasTemp                   100        ; in Kelvin, minimum temperature fas is allowed to get
 InitGasTemp                  462.77046  ; in Kelvin, Sets the initial gas temperature, if not provided in the ICs.
 ViscosityAlphaMin            0.1        ; minimum viscosity coefficient 
 MinGasHsml                   0.1        ; we can get negative smoothing lengths without this lower limit
 
 %---- Velocity Limiter Parameters
 LimitExtremeVelocities     1       % Whether to limit extreme particle velocities (0=no, 1=yes)
-LimitVelocitiesOnlyForGas  1       % Whether to limit velocities only for gas particles (0=no, 1=yes)
+LimitVelocitiesOnlyForGas  0       % Whether to limit velocities only for gas particles (0=no, 1=yes)
 MaxAllowedVelocity         750.0   % Maximum allowed velocity in code units
 
 % ---- Wind
@@ -127,7 +127,7 @@ FactorSN              0.193      % beta, mass fraction of massive stars (multi-p
 FactorEVP             1000       % A_0, evaporation parameter (multi-phase model); smaller value means lower pressure support, making it easier for gas to collapse
 TempSupernova         1e8        % T_SN, effective "supernova temperature",sets feedback energy (multi-phase model)
 TempClouds            1000       % temperature of cold clouds (multi-phase model)
-CritOverDensity       100       % default is 57.7; overdensity threshold value for cosmological sims; lower value means conditions easier to reach for SF
+CritOverDensity       57.7       % default is 57.7; overdensity threshold value for cosmological sims; lower value means conditions easier to reach for SF
 CritPhysDensity       0.1        % critical physical density for star formation (in cm^(-3))
 PhysDensThresh        0.0        % this gets set at runtime in coolsfr::set_units_sfr(void)
 TargetGasMass         1.0e5      # Target gas particle mass in code units
