@@ -188,87 +188,75 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
  *  \param ne_guess electron number density relative to hydrogen number density
  *  \return the gas temperature
  */
-double coolsfr::convert_u_to_temp(double u_code, double rho_code,
-                                    double *ne_guess, gas_state *gs,
-                                    const do_cool_data *DoCool)
-{
-    // Constants for solver
-    const int    MAX_ITERS = 50;
-    const double REL_TOL   = 1e-3;    // relative tolerance
-    const double ABS_TOL   = 1e-6;    // absolute tolerance in K
-
-    // Convert code units of u [erg/g] to physical cgs units
-    double u_cgs   = u_code * (All.UnitEnergy_in_cgs / All.UnitMass_in_g);
-    double rho_cgs = rho_code * All.UnitDensity_in_cgs;
-
-    // Compute initial mean molecular weight mu
-    double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + *ne_guess);
-
-    // Define temperature floor (in Kelvin)
-    double min_temp = (All.MinGasTemp > 0.0 ? All.MinGasTemp : 100.0);
-
-    // Handle invalid or non-positive internal energy
-    if(!isfinite(u_cgs) || u_cgs <= 0.0) {
-        *ne_guess = 0.0;
-        // Compute floor u in cgs: u = (k_B T)/(m_p mu)/(γ-1)
-        double u_floor_cgs = (min_temp * BOLTZMANN) / (PROTONMASS * mu) / GAMMA_MINUS1;
-        // Convert to code‐units of entropy A: A = u_code / rho_code^(γ-1)
-        double u_floor_code = u_floor_cgs * (All.UnitMass_in_g / All.UnitEnergy_in_cgs);
-        double A_floor = u_floor_code / pow(rho_code, GAMMA_MINUS1);
-        // Write floor entropy back to particle state
-        gs->Entropy = A_floor;
-        return min_temp;
-    }
-
-    // Initial temperature estimate: T = (γ−1) u_cgs (m_p/k_B) mu
-    double temp = GAMMA_MINUS1 * u_cgs * PROTONMASS / BOLTZMANN * mu;
-    temp = std::min(std::max(temp, min_temp), 1e12);
-
-    double temp_old = temp;
-    for(int iter = 0; iter < MAX_ITERS; ++iter) {
-        // Check for valid log(T)
-        double logT = log10(temp);
-        if(!isfinite(logT)) {
-            *ne_guess = 0.0;
-            // Recompute and write back floor entropy as above
-            double u_floor_cgs = (min_temp * BOLTZMANN) / (PROTONMASS * mu) / GAMMA_MINUS1;
-            double u_floor_code = u_floor_cgs * (All.UnitMass_in_g / All.UnitEnergy_in_cgs);
-            double A_floor = u_floor_code / pow(rho_code, GAMMA_MINUS1);
-            gs->Entropy = A_floor;
-            return min_temp;
-        }
-
-        // Update electron fraction & rates
-        find_abundances_and_rates(logT, rho_code, ne_guess, gs, DoCool);
-        // Recompute mu
-        mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + *ne_guess);
-        // Compute new temperature from updated mu
-        double temp_new = GAMMA_MINUS1 * u_cgs * PROTONMASS / BOLTZMANN * mu;
-        // Damped update
-        double damping = 1.0 + 0.1 * iter;
-        temp = temp_old + (temp_new - temp_old) / damping;
-        temp = std::min(std::max(temp, min_temp), 1e12);
-
-        // Convergence check
-        if(fabs(temp - temp_old) < std::max(REL_TOL * temp, ABS_TOL)) {
-            // Write back final entropy
-            double u_final_cgs = (temp * BOLTZMANN) / (PROTONMASS * mu) / GAMMA_MINUS1;
-            double u_final_code = u_final_cgs * (All.UnitMass_in_g / All.UnitEnergy_in_cgs);
-            double A_final = u_final_code / pow(rho_code, GAMMA_MINUS1);
-            gs->Entropy = A_final;
-            return temp;
-        }
-        temp_old = temp;
-    }
-
-    // If not converged, write back last entropy and warn
-    double u_final_cgs = (temp * BOLTZMANN) / (PROTONMASS * mu) / GAMMA_MINUS1;
-    double u_final_code = u_final_cgs * (All.UnitMass_in_g / All.UnitEnergy_in_cgs);
-    double A_final = u_final_code / pow(rho_code, GAMMA_MINUS1);
-    gs->Entropy = A_final;
-    mpi_printf("Warning: convert_u_to_temp did not converge in %d iterations, returning T=%g K\n", MAX_ITERS, temp);
-    return temp;
-}
+ double coolsfr::convert_u_to_temp(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
+ {
+     // --- Convert code‐units of u (erg/g in code) to physical cgs units ---
+     //   u_code × (UnitEnergy_in_cgs / UnitMass_in_g) → u_cgs [erg/g]
+     double u_cgs = u * (All.UnitEnergy_in_cgs / All.UnitMass_in_g);
+     
+     // Handle non‐positive or invalid internal energy
+     if(u_cgs <= 0.0 || !gsl_finite(u_cgs)) {
+         *ne_guess = 0.0;
+         // Use a safer minimum temperature (100K instead of 1K)
+         return All.MinGasTemp > 0 ? All.MinGasTemp : 100.0;
+     }
+     
+     // Initial guess for μ = mean molecular weight
+     double mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + *ne_guess);
+     
+     // Initial temperature estimate in Kelvin:
+     //   (γ−1) u [erg/g] × (m_p/k_B) × μ → T [K]
+     double temp = GAMMA_MINUS1 * u_cgs * PROTONMASS / BOLTZMANN * mu;
+     
+     // enforce physical bounds on the guess
+     // Use a larger minimum temperature for stability
+     double min_temp = All.MinGasTemp > 0 ? All.MinGasTemp : 100.0;
+     temp = std::min(std::max(temp, min_temp), 1e12);
+     
+     // solver parameters
+     const int    MAX_ITERS = 50;
+     const double REL_TOL   = 1e-3;    // relative tolerance
+     const double ABS_TOL   = 1e-6;    // absolute tolerance in K
+     
+     double temp_old = temp;
+     for(int iter = 0; iter < MAX_ITERS; ++iter) {
+         double ne_old = *ne_guess;
+         
+         // update electron fraction & rates at current T
+         if (!gsl_finite(std::log10(temp))) {
+             // Invalid temperature, return minimum temperature
+             printf("Warning: Invalid temperature in convert_u_to_temp: %g, u=%g, rho=%g\n", temp, u, rho);
+             *ne_guess = 0.0;
+             return min_temp;
+         }
+         
+         find_abundances_and_rates(std::log10(temp), rho, ne_guess, gs, DoCool);
+         
+         // recompute μ with updated ne
+         mu = (1.0 + 4.0*gs->yhelium) / (1.0 + gs->yhelium + *ne_guess);
+         
+         // new temperature from updated μ
+         double temp_new = GAMMA_MINUS1 * u_cgs * PROTONMASS / BOLTZMANN * mu;
+         
+         // damp oscillations lightly
+         double damping = 1.0 + 0.1 * iter;
+         temp = temp_old + (temp_new - temp_old)/damping;
+         
+         // clamp to physical range each iteration
+         temp = std::min(std::max(temp, min_temp), 1e12);
+         
+         // convergence check: either relative or absolute
+         double dt = std::abs(temp - temp_old);
+         if(dt < std::max(REL_TOL*temp, ABS_TOL)) {
+             return temp; 
+         }
+         temp_old = temp;
+     }
+     
+     // if we get here, we failed to converge – warn and return last value
+     printf("convert_u_to_temp did not converge in %d iterations, T≈%g K", MAX_ITERS, temp);
+     return temp;
+ }
 
 
 /** \brief Computes the actual abundance ratios.
