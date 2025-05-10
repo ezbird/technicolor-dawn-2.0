@@ -276,6 +276,7 @@ integertime simparticles::get_timestep_hydro(int p /*!< particle index */)
   if(P[p].getType() != 0)
     Terminate("P[p].getType() != 0");
 
+  // --- Compute total acceleration (hydro + gravity + PM) ---
   double ax = All.cf_afac2 * SphP[p].HydroAccel[0];
   double ay = All.cf_afac2 * SphP[p].HydroAccel[1];
   double az = All.cf_afac2 * SphP[p].HydroAccel[2];
@@ -290,172 +291,82 @@ integertime simparticles::get_timestep_hydro(int p /*!< particle index */)
   az += All.cf_a2inv * P[p].GravPM[2];
 #endif
 
-  double ac = sqrt(ax * ax + ay * ay + az * az); /* this is now the physical acceleration */
-
+  double ac = sqrt(ax*ax + ay*ay + az*az);
   if(ac == 0)
     ac = MIN_FLOAT_NUMBER;
 
-  /* determine the "kinematic" timestep dt_grav, in physical units */
-  double dt_kin = sqrt(2 * All.ErrTolIntAccuracy * All.cf_atime * SphP[p].Hsml / ac);
+  // --- Candidate timesteps in physical units ---
+  double dt_kin     = sqrt(2 * All.ErrTolIntAccuracy * All.cf_atime * SphP[p].Hsml / ac);
+  double dt_courant = (All.cf_atime/All.cf_afac3) * All.CourantFac * 2.0 * SphP[p].Hsml / (SphP[p].MaxSignalVel + MIN_FLOAT_NUMBER);
+  double dt_treebased = (All.cf_atime/All.cf_afac3) * SphP[p].CurrentMaxTiStep;
+  double dt_hsml    = All.cf_atime2 * All.CourantFac * fabs(SphP[p].Hsml / (SphP[p].DtHsml + MIN_FLOAT_NUMBER));
 
-  /* calculate local Courant timestep and treebased maximum timestep in physical units */
+  // --- NaN and non-positive guards ---
+  // we need to protect each of these dt's or else we can get NaN's and program crashes
+  if(!isfinite(dt_hsml)      || dt_hsml      <= 0.0) dt_hsml      = All.MaxSizeTimestep;
+  if(!isfinite(dt_treebased) || dt_treebased <= 0.0) dt_treebased = dt_hsml;
+  if(!isfinite(dt_courant)   || dt_courant   <= 0.0) dt_courant   = dt_hsml;
+  if(!isfinite(dt_kin)       || dt_kin       <= 0.0) dt_kin       = dt_courant;
 
-  double dt_courant = (All.cf_atime / All.cf_afac3) * All.CourantFac * 2.0 * SphP[p].Hsml / (SphP[p].MaxSignalVel + MIN_FLOAT_NUMBER);
-
-  double dt_treebased = (All.cf_atime / All.cf_afac3) * SphP[p].CurrentMaxTiStep;
-
-  /* calculate a timestep that restricts the rate at which the smoothing length may change,
-   * in physical units
-   */
-  double dt_hsml = All.cf_atime2 * All.CourantFac * fabs(SphP[p].Hsml / (SphP[p].DtHsml + MIN_FLOAT_NUMBER));
-
-  /* now take the smallest of these four criteria */
+  // --- Pick the minimum of all criteria ---
   double dt = dt_kin;
-  if(dt > dt_courant)
-    dt = dt_courant;
-  if(dt > dt_treebased)
-    dt = dt_treebased;
-  if(dt > dt_hsml)
-    dt = dt_hsml;
+  if(dt > dt_courant)    dt = dt_courant;
+  if(dt > dt_treebased)  dt = dt_treebased;
+  if(dt > dt_hsml)       dt = dt_hsml;
 
 #ifdef STARFORMATION
-  if(P[p].getType() == 0) /* to protect using a particle that has been turned into a star */
-    {
-      if(SphP[p].Sfr > 0)
-        {
-          double dt_sfr =
-              0.1 * P[p].getMass() / (SphP[p].Sfr / ((All.UnitMass_in_g / SOLAR_MASS) / (All.UnitTime_in_s / SEC_PER_YEAR)));
-          if(dt_sfr < dt)
-            dt = dt_sfr;
-        }
-    }
-#endif
-
-  /* convert the physical timestep to dloga in the cosmological case.
-   * Note: If comoving integration has not been selected, All.cf_hubble_a = 1.0.
-   */
-  dt *= All.cf_hubble_a;
-
-  if(dt >= All.MaxSizeTimestep)
-    dt = All.MaxSizeTimestep;
-
-#if defined(PMGRID) && !defined(TREEPM_NOTIMESPLIT)
-  if(dt >= All.DtDisplacement)
-    dt = All.DtDisplacement;
-#endif
-
-/*
-  if(dt < All.MinSizeTimestep)
-    {
-      if(P[p].getType() == 0)
-        Terminate(
-            "Timestep wants to be below the limit MinSizeTimestep=%g\n"
-            "Part-ID=%lld task=%d dtkin=%g dtcourant=%g ac=%g\n",
-            All.MinSizeTimestep, (long long)P[p].ID.get(), ThisTask, dt_kin * All.cf_hubble_a, dt_courant * All.cf_hubble_a, ac);
-      dt = All.MinSizeTimestep;
-    }
-*/
-
-if(dt < All.MinSizeTimestep)
-{
-  if(P[p].getType() == 0)
+  if(P[p].getType() == 0 && SphP[p].Sfr > 0)
   {
-    // Instead of terminating, limit the timestep and warn
-    mpi_printf("WARNING: Particle %lld has requested timestep dt=%g below MinSizeTimestep=%g (ac=%g). Limiting to minimum.\n",
-              (long long)P[p].ID.get(), dt, All.MinSizeTimestep, ac);
-    
-    // Dampen acceleration to prevent future problems
-    double max_acc = 50.0;  // Maximum allowed acceleration
-    for(int k = 0; k < 3; k++)
-    {
-      if(fabs(P[p].GravAccel[k]) > max_acc)
-        P[p].GravAccel[k] = (P[p].GravAccel[k] > 0) ? max_acc : -max_acc;
-    }
+    double dt_sfr = 0.1 * P[p].getMass() /
+        (SphP[p].Sfr / ((All.UnitMass_in_g/SOLAR_MASS)/(All.UnitTime_in_s/SEC_PER_YEAR)));
+    if(dt_sfr < dt)
+      dt = dt_sfr;
   }
-  dt = All.MinSizeTimestep;
-}
+#endif
+
+  // --- Convert and clamp against global max/min ---
+  dt *= All.cf_hubble_a;
+  if(dt >= All.MaxSizeTimestep) dt = All.MaxSizeTimestep;
+#if defined(PMGRID) && !defined(TREEPM_NOTIMESPLIT)
+  if(dt >= All.DtDisplacement) dt = All.DtDisplacement;
+#endif
+
+  if(dt < All.MinSizeTimestep)
+  {
+    if(P[p].getType() == 0)
+    {
+      mpi_printf("WARNING: Particle %lld requested dt=%g below MinSizeTimestep=%g (ac=%g). Clamping.\n",
+                 (long long)P[p].ID.get(), dt, All.MinSizeTimestep, ac);
+      // optional: damp extreme acceleration
+      double max_acc = 50.0;
+      for(int k=0; k<3; k++)
+        if(fabs(P[p].GravAccel[k]) > max_acc)
+          P[p].GravAccel[k] = (P[p].GravAccel[k]>0 ? max_acc : -max_acc);
+    }
+    dt = All.MinSizeTimestep;
+  }
 
   integertime ti_step = (integertime)(dt / All.Timebase_interval);
 
   if(!(ti_step > 0 && ti_step < TIMEBASE))
-    {
-      double pos[3];
-      intpos_to_pos(P[p].IntPos, pos); /* converts the integer coordinates to floating point */
-
-      Terminate(
-          "\nError: A timestep of size zero was assigned on the integer timeline!\n"
-          "We better stop.\n"
-          "Task=%d Part-ID=%lld type=%d dt=%g dtc=%g dt_kin=%g dt_treebased=%g dt_hsml=%g tibase=%g ti_step=%d ac=%g xyz=(%g|%g|%g) "
-          "vel=(%g|%g|%g) "
-          "tree=(%g|%g|%g) mass=%g  All.cf_hubble_a=%g\n\n",
-          ThisTask, (long long)P[p].ID.get(), P[p].getType(), dt, dt_courant, dt_kin, dt_treebased, dt_hsml, All.Timebase_interval,
-          (int)ti_step, ac, pos[0], pos[1], pos[2], P[p].Vel[0], P[p].Vel[1], P[p].Vel[2], P[p].GravAccel[0], P[p].GravAccel[1],
-          P[p].GravAccel[2], P[p].getMass(), All.cf_hubble_a);
-    }
+  {
+    double pos[3]; intpos_to_pos(P[p].IntPos, pos);
+    Terminate(
+      "\nError: zero/invalid timestep on integer timeline!\n"
+      "Task=%d Part-ID=%lld type=%d dt=%g dt_courant=%g dt_kin=%g dt_treebased=%g dt_hsml=%g tibase=%g ti_step=%d ac=%g xyz=(%g|%g|%g) "
+      "vel=(%g|%g|%g) tree=(%g|%g|%g) mass=%g All.cf_hubble_a=%g\n\n",
+      ThisTask, (long long)P[p].ID.get(), P[p].getType(), dt,
+      dt_courant, dt_kin, dt_treebased, dt_hsml,
+      All.Timebase_interval, (int)ti_step, ac,
+      pos[0], pos[1], pos[2],
+      P[p].Vel[0], P[p].Vel[1], P[p].Vel[2],
+      P[p].GravAccel[0], P[p].GravAccel[1], P[p].GravAccel[2],
+      P[p].getMass(), All.cf_hubble_a);
+  }
 
   return ti_step;
 }
 
-#if defined(PMGRID) && defined(PERIODIC) && !defined(TREEPM_NOTIMESPLIT)
-void simparticles::find_long_range_step_constraint(void)
-{
-  double dtmin = MAX_DOUBLE_NUMBER;
-
-  for(int p = 0; p < NumPart; p++)
-    {
-      if(P[p].getType() == 0)
-        continue;
-
-      /* calculate acceleration */
-      double ax = All.cf_a2inv * P[p].GravPM[0];
-      double ay = All.cf_a2inv * P[p].GravPM[1];
-      double az = All.cf_a2inv * P[p].GravPM[2];
-
-      double ac = sqrt(ax * ax + ay * ay + az * az); /* this is now the physical acceleration */
-
-      if(ac < 1.0e-30)
-        ac = 1.0e-30;
-
-#if NSOFTCLASSES > 1
-      double dt = sqrt(2 * All.ErrTolIntAccuracy * All.cf_atime * All.ForceSoftening[P[p].getSofteningClass()] / 2.8 / ac);
-#else
-      double dt = sqrt(2 * All.ErrTolIntAccuracy * All.cf_atime * All.ForceSoftening[0] / 2.8 / ac);
-#endif
-      dt *= All.cf_hubble_a;
-
-      if(dt < dtmin)
-        dtmin = dt;
-    }
-
-  dtmin *= 2.0; /* move it one timebin higher to prevent being too conservative */
-
-  MPI_Allreduce(&dtmin, &All.DtDisplacement, 1, MPI_DOUBLE, MPI_MIN, Communicator);
-
-  mpi_printf("TIMESTEPS: displacement time constraint: %g  (%g)\n", All.DtDisplacement, All.MaxSizeTimestep);
-
-  if(All.DtDisplacement > All.MaxSizeTimestep)
-    All.DtDisplacement = All.MaxSizeTimestep;
-}
-#endif
-
-int simparticles::get_timestep_bin(integertime ti_step)
-{
-  int bin = -1;
-
-  if(ti_step == 0)
-    return 0;
-
-  if(ti_step == 1)
-    Terminate("time-step of integer size 1 not allowed\n");
-
-  while(ti_step)
-    {
-      bin++;
-      ti_step >>= 1;
-    }
-
-  return bin;
-}
 
 void TimeBinData::timebins_init(const char *name, int *maxPart)
 {
