@@ -66,7 +66,7 @@ std::vector<double> g_energy_ratio;
  
  // Debug output function
  #define FEEDBACK_PRINT(...) \
-     do { if (All.FeedbackDebug) printf("[FEEDBACK] " __VA_ARGS__); } while (0)
+     do { if (All.FeedbackDebugLevel) printf("[FEEDBACK] " __VA_ARGS__); } while (0)
  
  // Physical constants and conversion factors
  const double HUBBLE_TIME = 13.8e9;              // Hubble time in years (approx)
@@ -663,7 +663,7 @@ std::vector<double> g_energy_ratio;
     }
     
     // Print summary (on master process only)
-    if (ThisTask == 0 && All.FeedbackDebug && 
+    if (ThisTask == 0 && All.FeedbackDebugLevel && 
        (ThisStepEnergy_SNII > 0 || ThisStepEnergy_SNIa > 0 || ThisStepEnergy_AGB > 0)) {
         FEEDBACK_PRINT("Timestep Summary: E_SNII=%.3e erg, E_SNIa=%.3e erg, E_AGB=%.3e erg\n",
                       ThisStepEnergy_SNII, ThisStepEnergy_SNIa, ThisStepEnergy_AGB);
@@ -724,7 +724,7 @@ std::vector<double> g_energy_ratio;
         walker->FindNeighborsWithinRadius(pos, h, i);
         
         if (walker->TargetCount == 0) {
-            if (ThisTask == 0 && All.FeedbackDebug) {
+            if (ThisTask == 0 && All.FeedbackDebugLevel) {
                 FEEDBACK_PRINT("WARNING! No targets found for star %d within h=%.2f for %s feedback\n", 
                               i, h, feedback_name);
             }
