@@ -198,6 +198,10 @@ void global_data_all_processes::register_parameters(void)
   add_param("WindFreeTravelLength", &WindFreeTravelLength, PARAM_DOUBLE, PARAM_FIXED);
   add_param("WindFreeTravelDensFac", &WindFreeTravelDensFac, PARAM_DOUBLE, PARAM_FIXED);
 
+  add_param("LimitExtremeVelocities", &LimitExtremeVelocities, PARAM_INT, PARAM_FIXED);
+  add_param("LimitVelocitiesOnlyForGas", &LimitVelocitiesOnlyForGas, PARAM_INT, PARAM_FIXED);
+  add_param("MaxAllowedVelocity", &MaxAllowedVelocity, PARAM_DOUBLE, PARAM_FIXED);
+
   add_param("FeedbackDebug", &FeedbackDebug, PARAM_INT, PARAM_FIXED);
   add_param("StarFormationDebug", &StarFormationDebug, PARAM_INT, PARAM_FIXED);
   add_param("FeedbackSNII", &FeedbackSNII, PARAM_INT, PARAM_FIXED);

@@ -271,10 +271,48 @@ integertime simparticles::get_timestep_pm(void)
 }
 #endif
 
+
+void simparticles::limit_particle_velocity(int i)
+{
+    // Skip if velocity limiting is disabled
+    if(!All.LimitExtremeVelocities)
+        return;
+
+    // Skip non-gas particles if desired
+    if(All.LimitVelocitiesOnlyForGas && P[i].getType() != 0)
+        return;
+    
+    // Calculate velocity magnitude
+    double v2 = 0.0;
+    for(int j = 0; j < 3; j++)
+        v2 += P[i].Vel[j] * P[i].Vel[j];
+    
+    double vmag = sqrt(v2);
+    
+    // Check if velocity exceeds max allowed
+    if(vmag > All.MaxAllowedVelocity)
+    {
+        // Scale down velocity to maximum allowed
+        double factor = All.MaxAllowedVelocity / vmag;
+        for(int j = 0; j < 3; j++)
+            P[i].Vel[j] *= factor;
+        
+        // Log for extreme cases
+        if(vmag > 10.0 * All.MaxAllowedVelocity)
+            mpi_printf("EXTREME VELOCITY: Particle %lld had v=%g, limited to %g\n", 
+                      (long long)P[i].ID.get(), vmag, All.MaxAllowedVelocity);
+    }
+}
+
+
 integertime simparticles::get_timestep_hydro(int p /*!< particle index */)
 {
   if(P[p].getType() != 0)
     Terminate("P[p].getType() != 0");
+
+  // Add velocity limiter before acceleration calculation
+  // Without this, velocities can possibly reach 10000 in code units -ez
+  limit_particle_velocity(p);
 
   // --- Compute total acceleration (hydro + gravity + PM) ---
   double ax = All.cf_afac2 * SphP[p].HydroAccel[0];

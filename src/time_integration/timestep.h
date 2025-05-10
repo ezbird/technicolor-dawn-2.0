@@ -40,6 +40,7 @@ struct TimeBinData
   void timebin_move_bh(int p, int timeBin_old, int timeBin_new);
   void timebin_make_list_of_active_particles_up_to_timebin(int timebin);
   void timebin_add_particles_of_timebin_to_list_of_active_particles(int timebin);
+  void limit_particle_velocity(int i);
 };
 
 #endif /* TIMESTEP */

@@ -339,6 +339,10 @@ struct global_data_all_processes : public parameters
   double WindFreeTravelLength;
   double WindFreeTravelDensFac;
 
+  int LimitExtremeVelocities;
+  int LimitVelocitiesOnlyForGas;
+  double MaxAllowedVelocity;
+
   int StarformationMode;
   double MetalYield;
 

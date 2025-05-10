@@ -97,10 +97,21 @@ MinimumComovingHydroSoftening 0.001
 %----- SPH
 ArtBulkViscConst             1.0
 %MinEgySpec                   0.05      ; took this out completely and replaced with MinGasTemp
-MinGasTemp                   50         ; minimum temperature fas is allowed to get
+MinGasTemp                   50         ; in Kelvin, minimum temperature fas is allowed to get
 InitGasTemp                  462.77046  ; in Kelvin, Sets the initial gas temperature, if not provided in the ICs.
 ViscosityAlphaMin            0.2        ; minimum viscosity coefficient 
 MinGasHsml                   0.1        ; we can get negative smoothing lengths without this lower limit
+
+%---- Velocity Limiter Parameters
+LimitExtremeVelocities     1       % Whether to limit extreme particle velocities (0=no, 1=yes)
+LimitVelocitiesOnlyForGas  1       % Whether to limit velocities only for gas particles (0=no, 1=yes)
+MaxAllowedVelocity         1000.0   % Maximum allowed velocity in code units
+
+% ---- Wind
+WindEfficiency        2.0
+WindEnergyFraction    1.0
+WindFreeTravelLength  20
+WindFreeTravelDensFac 0.1
 
 %----- Star formation
 StarformationMode     1
@@ -116,12 +127,6 @@ CritPhysDensity       0.1        % critical physical density for star formation 
 PhysDensThresh        0.0        % this gets set at runtime in coolsfr::set_units_sfr(void)
 TreecoolFile          data/TREECOOL
 TargetGasMass         1.0e5      # Target gas particle mass in code units
-
-% ---- Wind
-WindEfficiency        2.0
-WindEnergyFraction    1.0
-WindFreeTravelLength  20
-WindFreeTravelDensFac 0.1
 
 %----- Debugging
 StarFormationDebug  1     % Prints all star formation-related activity (0=off, 1=on)
