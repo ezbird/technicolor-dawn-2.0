@@ -2,7 +2,8 @@
 % NOTE: new parameters must be updated in allvars.cc and allvars.h
 
 %----  Relevant files 
-InitCondFile         ICs/ngenic_64_1000kpc
+InitCondFile         ICs/ngenic_32_100kpc
+TreecoolFile         data/TREECOOL_fg_dec11
 OutputDir            ./output
 SnapshotFileBase     snapshot
 OutputListFilename   empty.txt
@@ -31,7 +32,7 @@ OmegaLambda               0.6911
 OmegaBaryon               0.0486
 HubbleParam               0.6774
 Hubble                    0.1
-BoxSize                   1000          %  in kpc
+BoxSize                   100          %  in kpc
 
 %---- Output frequency and output paramaters
 OutputListOn              0
@@ -125,16 +126,17 @@ TempClouds            1000       % temperature of cold clouds (multi-phase model
 CritOverDensity       100       % default is 57.7; overdensity threshold value for cosmological sims; lower value means conditions easier to reach for SF
 CritPhysDensity       0.1        % critical physical density for star formation (in cm^(-3))
 PhysDensThresh        0.0        % this gets set at runtime in coolsfr::set_units_sfr(void)
-TreecoolFile          data/TREECOOL
 TargetGasMass         1.0e5      # Target gas particle mass in code units
 
-%----- Debugging
-StarFormationDebug  1     % Prints all star formation-related activity (0=off, 1=on)
-FeedbackDebug       1     % Prints all feedback-related activity (0=off, 1=on)
-FeedbackSNII        0     % Enable Type II supernova feedback (0=off, 1=on)
-FeedbackSNIa        0     % Enable Type Ia supernova feedback (0=off, 1=on)
-FeedbackAGB         1     % Enable AGB stellar winds feedback (0=off, 1=on)
+% ------ Feedback
+AGBFeedbackSNII          0     % Enable Type II supernova feedback (0=off, 1=on)
+FeedbackSNIa             0     % Enable Type Ia supernova feedback (0=off, 1=on)
+FeedbackAGB              1     % Enable AGB stellar winds feedback (0=off, 1=on)
 
+%----- Debugging
+StarFormationDebugLevel  1     % Prints star formation-related activity (0=none, 1=basic, 2=verbose)   NEED TO DO 1-2
+FeedbackDebugLevel       1     % Prints feedback-related activity (0=none, 1=basic, 2=verbose)    NEED TO DO 1-2
+UVBDebugLevel            1     % Prints UVB activity (0=none, 1=basic, 2=verbose)
 
 %----- Dust properties (PartType6)
 %DustFormationEfficiency 0.1   # 10% of metals turn into dust

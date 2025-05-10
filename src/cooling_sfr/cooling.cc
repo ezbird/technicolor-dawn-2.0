@@ -617,68 +617,153 @@ void coolsfr::ReadIonizeParams(char *fname)
     Terminate("The length of the cooling table has to have at least one entry");
 }
 
+
 /** \brief Set the ionization parameters for the UV background.
  */
 void coolsfr::IonizeParamsUVB(void)
 {
-
-  mpi_printf("IonizeParamsUVB is getting called now!");
-
-
-  if(!All.ComovingIntegrationOn)
+    if(!All.ComovingIntegrationOn)
     {
-      SetZeroIonization();
-      return;
+        SetZeroIonization();
+        return;
     }
 
-  if(NheattabUVB == 1)
+    double redshift = 1 / All.Time - 1;
+    double logz = log10(redshift + 1.0);
+    
+    // Debug output for UVB update
+    if(ThisTask == 0 && All.UVBDebugLevel > 0)
+        mpi_printf("COOLING: Updating UVB for z=%g, log(1+z)=%g\n", redshift, logz);
+
+    // Special case - handle single entry table
+    if(NheattabUVB == 1)
     {
-      /* treat the one value given as constant with redshift */
-      pc.J_UV   = 1;
-      pc.gJH0   = PhotoTUVB[0].gH0;
-      pc.gJHe0  = PhotoTUVB[0].gHe;
-      pc.gJHep  = PhotoTUVB[0].gHep;
-      pc.epsH0  = PhotoTUVB[0].eH0;
-      pc.epsHe0 = PhotoTUVB[0].eHe;
-      pc.epsHep = PhotoTUVB[0].eHep;
+        pc.J_UV   = 1;
+        pc.gJH0   = PhotoTUVB[0].gH0;
+        pc.gJHe0  = PhotoTUVB[0].gHe;
+        pc.gJHep  = PhotoTUVB[0].gHep;
+        pc.epsH0  = PhotoTUVB[0].eH0;
+        pc.epsHe0 = PhotoTUVB[0].eHe;
+        pc.epsHep = PhotoTUVB[0].eHep;
+        return;
     }
-  else
+
+    // Find table entries bracketing the current redshift
+    int ilow = 0;
+    for(int i = 0; i < NheattabUVB; i++)
     {
-      double redshift = 1 / All.Time - 1;
-      double logz     = log10(redshift + 1.0);
-      int ilow        = 0;
-      for(int i = 0; i < NheattabUVB; i++)
-        {
-          if(PhotoTUVB[i].variable < logz)
+        if(PhotoTUVB[i].variable <= logz)
             ilow = i;
-          else
+        else
             break;
-        }
-
-      if(logz > PhotoTUVB[NheattabUVB - 1].variable || ilow >= NheattabUVB - 1)
-        {
-          SetZeroIonization();
-        }
-      else
-        {
-          double dzlow = logz - PhotoTUVB[ilow].variable;
-          double dzhi  = PhotoTUVB[ilow + 1].variable - logz;
-
-          if(PhotoTUVB[ilow].gH0 == 0 || PhotoTUVB[ilow + 1].gH0 == 0)
-            {
-              SetZeroIonization();
-            }
-          else
-            {
-              pc.J_UV   = 1;
-              pc.gJH0   = pow(10., (dzhi * log10(PhotoTUVB[ilow].gH0) + dzlow * log10(PhotoTUVB[ilow + 1].gH0)) / (dzlow + dzhi));
-              pc.gJHe0  = pow(10., (dzhi * log10(PhotoTUVB[ilow].gHe) + dzlow * log10(PhotoTUVB[ilow + 1].gHe)) / (dzlow + dzhi));
-              pc.gJHep  = pow(10., (dzhi * log10(PhotoTUVB[ilow].gHep) + dzlow * log10(PhotoTUVB[ilow + 1].gHep)) / (dzlow + dzhi));
-              pc.epsH0  = pow(10., (dzhi * log10(PhotoTUVB[ilow].eH0) + dzlow * log10(PhotoTUVB[ilow + 1].eH0)) / (dzlow + dzhi));
-              pc.epsHe0 = pow(10., (dzhi * log10(PhotoTUVB[ilow].eHe) + dzlow * log10(PhotoTUVB[ilow + 1].eHe)) / (dzlow + dzhi));
-              pc.epsHep = pow(10., (dzhi * log10(PhotoTUVB[ilow].eHep) + dzlow * log10(PhotoTUVB[ilow + 1].eHep)) / (dzlow + dzhi));
-            }
-        }
+    }
+    
+    // Handle edge cases: beyond table range
+    if(logz > PhotoTUVB[NheattabUVB - 1].variable)
+    {
+        // Beyond highest redshift in table - set to zero
+        SetZeroIonization();
+        if(ThisTask == 0 && All.UVBDebugLevel > 0)
+            mpi_printf("COOLING: z=%g beyond table range (z>%g), setting UVB to zero\n", 
+                      redshift, pow(10.0, PhotoTUVB[NheattabUVB - 1].variable) - 1.0);
+        return;
+    }
+    
+    // Handle edge cases: below table range
+    if(logz < PhotoTUVB[0].variable)
+    {
+        // Below lowest redshift in table - use first entry
+        pc.J_UV   = 1;
+        pc.gJH0   = PhotoTUVB[0].gH0;
+        pc.gJHe0  = PhotoTUVB[0].gHe;
+        pc.gJHep  = PhotoTUVB[0].gHep;
+        pc.epsH0  = PhotoTUVB[0].eH0;
+        pc.epsHe0 = PhotoTUVB[0].eHe;
+        pc.epsHep = PhotoTUVB[0].eHep;
+        
+        if(ThisTask == 0 && All.UVBDebugLevel > 0)
+            mpi_printf("COOLING: z=%g below table range (z<%g), using first entry\n", 
+                      redshift, pow(10.0, PhotoTUVB[0].variable) - 1.0);
+        return;
+    }
+    
+    // Handle edge cases: at exact table boundary
+    if(ilow == NheattabUVB - 1)
+    {
+        // At the highest entry - use last tabulated value
+        pc.J_UV   = 1;
+        pc.gJH0   = PhotoTUVB[ilow].gH0;
+        pc.gJHe0  = PhotoTUVB[ilow].gHe;
+        pc.gJHep  = PhotoTUVB[ilow].gHep;
+        pc.epsH0  = PhotoTUVB[ilow].eH0;
+        pc.epsHe0 = PhotoTUVB[ilow].eHe;
+        pc.epsHep = PhotoTUVB[ilow].eHep;
+        return;
+    }
+    
+    // Normal case - interpolate between table entries
+    double dzlow = logz - PhotoTUVB[ilow].variable;
+    double dzhi = PhotoTUVB[ilow + 1].variable - logz;
+    double dz = dzhi + dzlow;  // Total interval between table entries
+    
+    // FG20 has zeros at high redshift - handle zeros properly
+    if(PhotoTUVB[ilow].gH0 == 0.0 || PhotoTUVB[ilow + 1].gH0 == 0.0)
+    {
+        // If either entry is zero, use linear interpolation
+        pc.J_UV   = 1;  // UVB is present
+        pc.gJH0   = (PhotoTUVB[ilow].gH0 * dzhi + PhotoTUVB[ilow + 1].gH0 * dzlow) / dz;
+        pc.gJHe0  = (PhotoTUVB[ilow].gHe * dzhi + PhotoTUVB[ilow + 1].gHe * dzlow) / dz;
+        pc.gJHep  = (PhotoTUVB[ilow].gHep * dzhi + PhotoTUVB[ilow + 1].gHep * dzlow) / dz;
+        pc.epsH0  = (PhotoTUVB[ilow].eH0 * dzhi + PhotoTUVB[ilow + 1].eH0 * dzlow) / dz;
+        pc.epsHe0 = (PhotoTUVB[ilow].eHe * dzhi + PhotoTUVB[ilow + 1].eHe * dzlow) / dz;
+        pc.epsHep = (PhotoTUVB[ilow].eHep * dzhi + PhotoTUVB[ilow + 1].eHep * dzlow) / dz;
+    }
+    else
+    {
+        // Both entries non-zero, use log-log interpolation for smoother transition
+        pc.J_UV   = 1;
+        pc.gJH0   = pow(10.0, (log10(PhotoTUVB[ilow].gH0) * dzhi + log10(PhotoTUVB[ilow + 1].gH0) * dzlow) / dz);
+        pc.gJHe0  = pow(10.0, (log10(PhotoTUVB[ilow].gHe) * dzhi + log10(PhotoTUVB[ilow + 1].gHe) * dzlow) / dz);
+        
+        // For values that might be zero, check before doing log
+        if(PhotoTUVB[ilow].gHep > 0.0 && PhotoTUVB[ilow + 1].gHep > 0.0)
+            pc.gJHep = pow(10.0, (log10(PhotoTUVB[ilow].gHep) * dzhi + log10(PhotoTUVB[ilow + 1].gHep) * dzlow) / dz);
+        else
+            pc.gJHep = (PhotoTUVB[ilow].gHep * dzhi + PhotoTUVB[ilow + 1].gHep * dzlow) / dz;
+            
+        if(PhotoTUVB[ilow].eH0 > 0.0 && PhotoTUVB[ilow + 1].eH0 > 0.0)
+            pc.epsH0 = pow(10.0, (log10(PhotoTUVB[ilow].eH0) * dzhi + log10(PhotoTUVB[ilow + 1].eH0) * dzlow) / dz);
+        else
+            pc.epsH0 = (PhotoTUVB[ilow].eH0 * dzhi + PhotoTUVB[ilow + 1].eH0 * dzlow) / dz;
+            
+        if(PhotoTUVB[ilow].eHe > 0.0 && PhotoTUVB[ilow + 1].eHe > 0.0)
+            pc.epsHe0 = pow(10.0, (log10(PhotoTUVB[ilow].eHe) * dzhi + log10(PhotoTUVB[ilow + 1].eHe) * dzlow) / dz);
+        else
+            pc.epsHe0 = (PhotoTUVB[ilow].eHe * dzhi + PhotoTUVB[ilow + 1].eHe * dzlow) / dz;
+            
+        if(PhotoTUVB[ilow].eHep > 0.0 && PhotoTUVB[ilow + 1].eHep > 0.0)
+            pc.epsHep = pow(10.0, (log10(PhotoTUVB[ilow].eHep) * dzhi + log10(PhotoTUVB[ilow + 1].eHep) * dzlow) / dz);
+        else
+            pc.epsHep = (PhotoTUVB[ilow].eHep * dzhi + PhotoTUVB[ilow + 1].eHep * dzlow) / dz;
+    }
+    
+    // Safety check - ensure no NaN values
+    if(!gsl_finite(pc.gJH0) || !gsl_finite(pc.gJHe0) || !gsl_finite(pc.gJHep) ||
+       !gsl_finite(pc.epsH0) || !gsl_finite(pc.epsHe0) || !gsl_finite(pc.epsHep))
+    {
+        mpi_printf("WARNING: NaN values detected in UVB rates at z=%g, setting to zero\n", redshift);
+        SetZeroIonization();
+    }
+    
+    // Detailed debug output
+    if(ThisTask == 0 && All.UVBDebugLevel > 1)
+    {
+        mpi_printf("COOLING: UVB at z=%g (between table entries z=%g and z=%g):\n", 
+                 redshift, 
+                 pow(10.0, PhotoTUVB[ilow].variable) - 1.0,
+                 pow(10.0, PhotoTUVB[ilow+1].variable) - 1.0);
+        mpi_printf("  gJH0=%g, gJHe0=%g, gJHep=%g\n", pc.gJH0, pc.gJHe0, pc.gJHep);
+        mpi_printf("  epsH0=%g, epsHe0=%g, epsHep=%g\n", pc.epsH0, pc.epsHe0, pc.epsHep);
     }
 }
 

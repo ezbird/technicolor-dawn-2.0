@@ -346,8 +346,10 @@ struct global_data_all_processes : public parameters
   int StarformationMode;
   double MetalYield;
 
-  int FeedbackDebug;         /* Print detailed diagnostics (0=no, 1=yes) */
-  int StarFormationDebug;    /* Print detailed diagnostics (0=no, 1=yes) */
+  int FeedbackDebugLevel;         /* Print detailed diagnostics (0=no, 1=yes) */
+  int StarFormationDebugLevel;    /* Print detailed diagnostics (0=no, 1=yes) */
+  int UVBDebugLevel;     /*!< Level of detail for UVB debugging output */
+
   int FeedbackSNII;          /* Enable Type II supernova feedback (0=off, 1=on) */
   int FeedbackSNIa;          /* Enable Type Ia supernova feedback (0=off, 1=on) */
   int FeedbackAGB;           /* Enable AGB stellar winds feedback (0=off, 1=on) */

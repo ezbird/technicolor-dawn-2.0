@@ -35,7 +35,7 @@
 
  // Debug output function
  #define STARFORMATION_PRINT(...) \
-     do { if (All.StarFormationDebug) printf("[STARFORMATION] " __VA_ARGS__); } while (0)
+     do { if (All.StarFormationDebugLevel) printf("[STARFORMATION] " __VA_ARGS__); } while (0)
 
 /**
  * Set up units for the star formation code
@@ -159,18 +159,6 @@ void coolsfr::init_clouds(void)
           mpi_printf("COOLSFR: tcool=%g dens=%g egyhot=%g\n", tcool, dens, egyhot);
         }
 
-#if defined(SGREGSF) 
-      double s_to_gyr, G_internalunit, GyrInternal;
-      s_to_gyr = 3.15569e16;
-      G_internalunit = 6.674e-8 * All.UnitMass_in_g/(All.UnitLength_in_cm*All.UnitLength_in_cm*All.UnitLength_in_cm)*(s_to_gyr*s_to_gyr);
-      GyrInternal    = 1./(0.98/All.HubbleParam);
-      All.GInternal  = G_internalunit / (GyrInternal*GyrInternal);
-      if(ThisTask==0)
-        {
-          mpi_printf("COOLSFR: All.G=%0.4e All.GInternal=%0.4e\n", All.G, All.GInternal);
-        }
-#endif
-
       dens = All.PhysDensThresh * 10;
 
       do
@@ -277,10 +265,8 @@ double coolsfr::get_starformation_rate(int i, double *xcloud, simparticles *Sp)
   double tsfr, cloudmass;
   gas_state gs = GasState;
 
-#if !defined(H2REGSF) && !defined(SGREGSF) && !defined(H2AUTOSHIELD)
   double factorEVP, egyhot, ne, tcool, y, x;
   do_cool_data DoCool = DoCoolData;
-#endif
 
   *xcloud = 0.0; /* default: no molecular clouds */
 
