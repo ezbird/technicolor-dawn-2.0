@@ -64,6 +64,8 @@ class simparticles : public intposconvert, public setcomm
 
   subfind_data *PS;
 
+  void limit_particle_velocity(int i);
+
   inline void copy_particle(particle_data *Ptarget, particle_data *Psource)
   {
     // we do this ugly trick here because the atomic_flag in particle_data has an implicitly deleted copy operator...
