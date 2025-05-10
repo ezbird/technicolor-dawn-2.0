@@ -91,9 +91,9 @@ TIMEDEP_ART_VISC                             # enables time dependend viscosity 
 
 COOLING                                      # Enables radiative atomic cooling by hydrogen and helium
 STARFORMATION                                # Enables star formation with the Springel & Hernquist (2003) model
-FEEDBACK
+#FEEDBACK
 #DUST
-WINDS
+#WINDS
 
 #---------------------------------------- Single/double precision and data types
 
