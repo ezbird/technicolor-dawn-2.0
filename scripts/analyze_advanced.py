@@ -21,8 +21,8 @@ def analyze_snapshot(filename):
             # Get header info
             redshift = f['Header'].attrs['Redshift']
             time = f['Header'].attrs['Time']
-            hubble = f['Header'].attrs['HubbleParam']
-            box_size = f['Header'].attrs['BoxSize']
+            hubble = f['Parameters'].attrs['HubbleParam']
+            box_size = f['Parameters'].attrs['BoxSize']
             
             # Get gas properties
             gas_density = f['PartType0/Density'][:]
