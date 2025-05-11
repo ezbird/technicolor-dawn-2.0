@@ -2,7 +2,7 @@
 % NOTE: new parameters must be updated in allvars.cc and allvars.h
 
 %----  Relevant files 
-InitCondFile         ICs/ngenic_64_5000kpc
+InitCondFile         ICs/ngenic_32_1000kpc
 TreecoolFile         data/TREECOOL_fg_dec11
 OutputDir            ./output
 SnapshotFileBase     snapshot
@@ -32,7 +32,7 @@ OmegaLambda               0.6911
 OmegaBaryon               0.0486
 HubbleParam               0.6774
 Hubble                    0.1
-BoxSize                   5000          %  in kpc
+BoxSize                   1000          %  in kpc
 
 %---- Output frequency and output paramaters
 OutputListOn              0
