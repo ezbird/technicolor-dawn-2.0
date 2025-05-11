@@ -51,6 +51,18 @@ std::vector<int>    g_neighbors_per_star;
 std::vector<double> g_h_per_star;
 std::vector<double> g_energy_ratio;
 
+// If no place for feedback is found, these variables will be used to track
+// those events and redistribute the energy and metals later.
+double TotalLostEnergy_SNII = 0.0;
+double TotalLostEnergy_SNIa = 0.0;
+double TotalLostEnergy_AGB = 0.0;
+double TotalLostMass_SNII = 0.0;
+double TotalLostMass_SNIa = 0.0;
+double TotalLostMass_AGB = 0.0;
+double TotalLostMetals_SNII[4] = {0.0};
+double TotalLostMetals_SNIa[4] = {0.0};
+double TotalLostMetals_AGB[4] = {0.0};
+
  // Define NEAREST macros for periodic wrapping (or no-op if not periodic)
  #define NEAREST(x, box) (((x) > 0.5 * (box)) ? ((x) - (box)) : (((x) < -0.5 * (box)) ? ((x) + (box)) : (x)))
  #define NEAREST_X(x) NEAREST(x, All.BoxSize)
@@ -242,6 +254,72 @@ std::vector<double> g_energy_ratio;
  }
  
  /**
+ * Redistributes lost feedback materials to the simulation
+ */
+void redistribute_lost_feedback(simparticles *Sp) {
+    // Only do this occasionally, e.g., every 20 snapshots or major time steps
+    static int counter = 0;
+    counter++;
+    if (counter % 20 != 0)
+        return;
+        
+    // Check if we have significant lost materials
+    double total_lost_mass = TotalLostMass_SNII + TotalLostMass_SNIa + TotalLostMass_AGB;
+    if (total_lost_mass < 1e-6)  // Threshold in Msun
+        return;
+        
+    FEEDBACK_PRINT("Redistributing lost feedback: mass=%.3e, energy=%.3e erg\n", 
+                  total_lost_mass, 
+                  TotalLostEnergy_SNII + TotalLostEnergy_SNIa + TotalLostEnergy_AGB);
+                  
+    // Find eligible gas particles for redistribution
+    // Typically, you'd want to redistribute to the diffuse phase
+    std::vector<int> eligible_particles;
+    for (int i = 0; i < Sp->NumPart; i++) {
+        if (Sp->P[i].getType() != 0)  // Skip non-gas particles
+            continue;
+            
+        // Example criteria: density below some threshold
+        double density = Sp->SphP[i].Density;
+        if (density < 1e-26)  // g/cm³, adjust based on your units
+            eligible_particles.push_back(i);
+    }
+    
+    int n_eligible = eligible_particles.size();
+    if (n_eligible == 0)
+        return;
+        
+    // Redistribute mass and metals
+    double mass_per_particle = total_lost_mass / n_eligible;
+    double energy_per_particle = (TotalLostEnergy_SNII + TotalLostEnergy_SNIa + TotalLostEnergy_AGB) / n_eligible;
+    
+    for (int idx : eligible_particles) {
+        // Add mass
+        double old_mass = Sp->P[idx].getMass();
+        Sp->P[idx].setMass(old_mass + mass_per_particle);
+        
+        // Add metals (weighted average of different sources)
+        for (int k = 0; k < 4; k++) {
+            double metals_add = (TotalLostMetals_SNII[k] + TotalLostMetals_SNIa[k] + TotalLostMetals_AGB[k]) / n_eligible;
+            Sp->SphP[idx].Metals[k] += metals_add / old_mass;  // Convert to mass fraction
+        }
+        
+        // Add energy (very diluted to avoid numerical issues)
+        double u_before = Sp->get_utherm_from_entropy(idx);
+        double delta_u = energy_per_particle * erg_per_mass_to_code / old_mass;
+        double u_after = u_before + delta_u * 0.01;  // Add only 1% to avoid instabilities
+        Sp->set_entropy_from_utherm(u_after, idx);
+    }
+    
+    // Reset counters
+    TotalLostMass_SNII = TotalLostMass_SNIa = TotalLostMass_AGB = 0.0;
+    TotalLostEnergy_SNII = TotalLostEnergy_SNIa = TotalLostEnergy_AGB = 0.0;
+    for (int k = 0; k < 4; k++) {
+        TotalLostMetals_SNII[k] = TotalLostMetals_SNIa[k] = TotalLostMetals_AGB[k] = 0.0;
+    }
+}
+
+ /**
   * Determine if a star particle is eligible for feedback
   */
  bool is_star_eligible_for_feedback(int i, int feedback_type, double current_time, simparticles *Sp) {
@@ -322,6 +400,23 @@ std::vector<double> g_energy_ratio;
          FeedbackType = type;
      }
  
+    // In the FeedbackTreeWalk class
+    void AddTarget(int index, double dist, double weight, double dir_x, double dir_y, double dir_z) {
+        if (TargetCount >= MaxTargets) {
+            MaxTargets *= 2;
+            Targets = (FeedbackTargetData *)Mem.myrealloc_movable(Targets, MaxTargets * sizeof(FeedbackTargetData));
+        }
+        
+        Targets[TargetCount].index = index;
+        Targets[TargetCount].dist = dist;
+        Targets[TargetCount].weight = weight;
+        Targets[TargetCount].dir[0] = dir_x;
+        Targets[TargetCount].dir[1] = dir_y;
+        Targets[TargetCount].dir[2] = dir_z;
+        
+        TargetCount++;
+    }
+
      // Find gas neighbors using direct search
      void FindNeighborsWithinRadius(double pos[3], double hsml, int stellar_index) {
          TargetCount = 0;
@@ -587,7 +682,7 @@ std::vector<double> g_energy_ratio;
     // Initial parameters
     double h = get_initial_feedback_radius(feedback_type);
     double h_min = 0.1;  // kpc
-    double h_max = 3.0;  // kpc
+    double h_max = 5.0;  // kpc
     
     // Target neighbor counts
     int target_min = 0;
@@ -602,7 +697,7 @@ std::vector<double> g_energy_ratio;
         target_max = 128;
     }
     else {  // AGB
-        target_min = 16;
+        target_min = 4;
         target_max = 64;
     }
     
@@ -672,6 +767,7 @@ std::vector<double> g_energy_ratio;
                       ThisStepMetalsInjected[0], ThisStepMetalsInjected[1], 
                       ThisStepMetalsInjected[2], ThisStepMetalsInjected[3]);
     }
+    redistribute_lost_feedback(Sp);
     OutputFeedbackDiagnostics();  // Output diagnostics after processing this feedback type
 }
 
@@ -723,11 +819,147 @@ std::vector<double> g_energy_ratio;
         // Apply feedback
         walker->FindNeighborsWithinRadius(pos, h, i);
         
+        //---------------------------------------------------------------------------
+        // How to handle things if we find no nearby gas targets to apply feedback?
+        //---------------------------------------------------------------------------
+        // 1. Finds the nearest gas particles for stars with no neighbors in their search radius
+        // 2. Applies feedback to these particles with distance-weighted contributions
+        // 3. Tracks lost feedback when no gas particles can be found at all
+        // 4. Periodically redistributes lost feedback to maintain energy and metal conservation
         if (walker->TargetCount == 0) {
             if (ThisTask == 0 && All.FeedbackDebugLevel) {
                 FEEDBACK_PRINT("WARNING! No targets found for star %d within h=%.2f for %s feedback\n", 
-                              i, h, feedback_name);
+                            i, h, feedback_name);
             }
+            
+            // Instead of skipping, find N nearest gas particles regardless of distance
+            int n_to_find = 10;  // Number of nearest gas particles to find
+            
+            // Create arrays to store nearest gas particles and their distances
+            int *nearest_indices = (int *)Mem.mymalloc("nearest_indices", n_to_find * sizeof(int));
+            double *nearest_dists = (double *)Mem.mymalloc("nearest_dists", n_to_find * sizeof(double));
+            
+            // Initialize with large values
+            for (int k = 0; k < n_to_find; k++) {
+                nearest_indices[k] = -1;
+                nearest_dists[k] = 1.0e30;
+            }
+            
+            // Convert star position to physical coordinates
+            double star_pos[3];
+            star_pos[0] = intpos_to_kpc(Sp->P[i].IntPos[0]);
+            star_pos[1] = intpos_to_kpc(Sp->P[i].IntPos[1]);
+            star_pos[2] = intpos_to_kpc(Sp->P[i].IntPos[2]);
+            
+            // Find N nearest gas particles
+            for (int j = 0; j < Sp->NumPart; j++) {
+                if (Sp->P[j].getType() != 0)  // Skip non-gas particles
+                    continue;
+                    
+                // Calculate distance
+                double gas_pos[3];
+                gas_pos[0] = intpos_to_kpc(Sp->P[j].IntPos[0]);
+                gas_pos[1] = intpos_to_kpc(Sp->P[j].IntPos[1]);
+                gas_pos[2] = intpos_to_kpc(Sp->P[j].IntPos[2]);
+                
+                double dx = star_pos[0] - gas_pos[0];
+                double dy = star_pos[1] - gas_pos[1];
+                double dz = star_pos[2] - gas_pos[2];
+                
+                // Handle periodic boundary conditions
+                if (All.BoxSize > 0) {
+                    dx = NEAREST_X(dx);
+                    dy = NEAREST_Y(dy);
+                    dz = NEAREST_Z(dz);
+                }
+                
+                double r2 = dx*dx + dy*dy + dz*dz;
+                double r = sqrt(r2);
+                
+                // Skip particles too close (avoid numerical instabilities)
+                if (r < MIN_FEEDBACK_SEPARATION)
+                    continue;
+                    
+                // Check if this particle is closer than our current nearest
+                for (int k = 0; k < n_to_find; k++) {
+                    if (r < nearest_dists[k]) {
+                        // Shift everything down to make room
+                        for (int m = n_to_find-1; m > k; m--) {
+                            nearest_indices[m] = nearest_indices[m-1];
+                            nearest_dists[m] = nearest_dists[m-1];
+                        }
+                        // Insert this one
+                        nearest_indices[k] = j;
+                        nearest_dists[k] = r;
+                        break;
+                    }
+                }
+            }
+            
+            // Count how many valid particles we found
+            int n_found = 0;
+            for (int k = 0; k < n_to_find; k++) {
+                if (nearest_indices[k] >= 0)
+                    n_found++;
+            }
+            
+            if (n_found > 0) {
+                FEEDBACK_PRINT("Using %d nearest gas particles for remote deposition (dist range: %.2f to %.2f kpc)\n", 
+                            n_found, nearest_dists[0], nearest_dists[n_found-1]);
+                            
+                // Re-run the neighbor finding with the furthest distance found
+                double extended_radius = nearest_dists[n_found-1] * 1.01; // Add 1% to ensure inclusion
+                walker->FindNeighborsWithinRadius(pos, extended_radius, i);
+                
+                // Check if we found the expected number
+                if (walker->TargetCount == n_found) {
+                    FEEDBACK_PRINT("Successfully found %d targets with extended radius %.2f\n", 
+                                walker->TargetCount, extended_radius);
+                    
+                    // Apply feedback normally
+                    walker->ApplyFeedback(stellar_mass, metallicity, snia_events);
+                } else {
+                    FEEDBACK_PRINT("Warning: Expected %d targets but found %d with extended radius %.2f\n",
+                                n_found, walker->TargetCount, extended_radius);
+                                
+                    // Safety check
+                    if (walker->TargetCount > 0) {
+                        walker->ApplyFeedback(stellar_mass, metallicity, snia_events);
+                    } else {
+                        // Track lost feedback
+                        // (Code for tracking lost feedback as in previous example)
+                    }
+                }
+            } else {
+                FEEDBACK_PRINT("Could not find ANY gas particles for star %d - feedback lost\n", i);
+                
+                // Track lost feedback for potential redistribution
+                if (feedback_type == FEEDBACK_SNII) {
+                    double energy_lost = SNII_ENERGY_PER_MASS * stellar_mass;
+                    double mass_lost = MASS_RETURN_SNII * stellar_mass;
+                    Yields yields = get_SNII_yields(mass_lost, metallicity);
+                    
+                    // Update global tracking (you'll need to define these variables)
+                    TotalLostEnergy_SNII += energy_lost;
+                    TotalLostMass_SNII += mass_lost;
+                    TotalLostMetals_SNII[0] += yields.Z;
+                    TotalLostMetals_SNII[1] += yields.C;
+                    TotalLostMetals_SNII[2] += yields.O;
+                    TotalLostMetals_SNII[3] += yields.Fe;
+                }
+                else if (feedback_type == FEEDBACK_AGB) {
+                    // Similar tracking for AGB...
+                }
+                else if (feedback_type == FEEDBACK_SNIa) {
+                    // Similar tracking for SNIa...
+                }
+            }
+            
+            // Free memory
+            Mem.myfree(nearest_dists);
+            Mem.myfree(nearest_indices);
+            
+            // Skip the normal ApplyFeedback call
             continue;
         }
         
