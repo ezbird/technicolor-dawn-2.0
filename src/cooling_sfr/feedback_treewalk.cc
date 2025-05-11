@@ -64,7 +64,7 @@ std::vector<double> g_energy_ratio;
  
  #define SNII_ENERGY (1.0e51 / All.UnitEnergy_in_cgs)  // in internal units
  
- // Debug output function
+ // If debugging is enabled, print feedback messages
  #define FEEDBACK_PRINT(...) \
      do { if (All.FeedbackDebugLevel) printf("[FEEDBACK] " __VA_ARGS__); } while (0)
  

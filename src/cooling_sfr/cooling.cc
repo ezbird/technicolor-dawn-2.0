@@ -33,6 +33,10 @@
 #define eV_to_K 11604.505    // Conversion factor from eV to Kelvin
 #define eV_to_erg 1.602e-12  // Conversion factor from eV to erg
 
+ // If debugging is enabled, print feedback messages
+ #define COOLING_PRINT(...) \
+     do { if (All.CoolingDebugLevel) printf("[COOLING] " __VA_ARGS__); } while (0)
+
 // ----------------------------------------------------------------------
 // Allocate the rate table for NCOOLTAB+1 entries
 // ----------------------------------------------------------------------
@@ -225,7 +229,7 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
          // update electron fraction & rates at current T
          if (!gsl_finite(std::log10(temp))) {
              // Invalid temperature, return minimum temperature
-             printf("Warning: Invalid temperature in convert_u_to_temp: %g, u=%g, rho=%g\n", temp, u, rho);
+             COOLING_PRINT("Warning: Invalid temperature in convert_u_to_temp: %g, u=%g, rho=%g\n", temp, u, rho);
              *ne_guess = 0.0;
              return min_temp;
          }
@@ -254,7 +258,7 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
      }
      
      // if we get here, we failed to converge – warn and return last value
-     printf("convert_u_to_temp did not converge in %d iterations, T≈%g K", MAX_ITERS, temp);
+     COOLING_PRINT("convert_u_to_temp did not converge in %d iterations, T≈%g K", MAX_ITERS, temp);
      return temp;
  }
 
@@ -274,7 +278,7 @@ void coolsfr::find_abundances_and_rates(double logT, double rho, double *ne_gues
   double ne_input   = *ne_guess;
 
   if(!gsl_finite(logT)) {
-      fprintf(stderr, "Warning: find_abundances called with logT=%g → clamping to [%g,%g]\n",logT, Tmin, Tmax);
+      COOLING_PRINT(stderr, "Warning: find_abundances called with logT=%g → clamping to [%g,%g]\n",logT, Tmin, Tmax);
       logT = std::min(std::max(logT_input, Tmin), Tmax);
   }
 
@@ -374,7 +378,7 @@ void coolsfr::find_abundances_and_rates(double logT, double rho, double *ne_gues
         break;
 
       if(niter > (MAXITER - 10))
-        printf("ne= %g  niter=%d\n", gs->ne, niter);
+        COOLING_PRINT("ne= %g  niter=%d\n", gs->ne, niter);
     }
   while(niter < MAXITER);
 
@@ -632,8 +636,8 @@ void coolsfr::IonizeParamsUVB(void)
     double logz = log10(redshift + 1.0);
     
     // Debug output for UVB update
-    if(ThisTask == 0 && All.UVBDebugLevel > 0)
-        mpi_printf("COOLING: Updating UVB for z=%g, log(1+z)=%g\n", redshift, logz);
+    if(ThisTask == 0)
+        COOLING_PRINT("Updating UVB for z=%g, log(1+z)=%g\n", redshift, logz);
 
     // Special case - handle single entry table
     if(NheattabUVB == 1)
@@ -663,8 +667,8 @@ void coolsfr::IonizeParamsUVB(void)
     {
         // Beyond highest redshift in table - set to zero
         SetZeroIonization();
-        if(ThisTask == 0 && All.UVBDebugLevel > 0)
-            mpi_printf("COOLING: z=%g beyond table range (z>%g), setting UVB to zero\n", 
+        if(ThisTask == 0)
+            COOLING_PRINT("z=%g beyond table range (z>%g), setting UVB to zero\n", 
                       redshift, pow(10.0, PhotoTUVB[NheattabUVB - 1].variable) - 1.0);
         return;
     }
@@ -681,8 +685,8 @@ void coolsfr::IonizeParamsUVB(void)
         pc.epsHe0 = PhotoTUVB[0].eHe;
         pc.epsHep = PhotoTUVB[0].eHep;
         
-        if(ThisTask == 0 && All.UVBDebugLevel > 0)
-            mpi_printf("COOLING: z=%g below table range (z<%g), using first entry\n", 
+        if(ThisTask == 0)
+            COOLING_PRINT("z=%g below table range (z<%g), using first entry\n", 
                       redshift, pow(10.0, PhotoTUVB[0].variable) - 1.0);
         return;
     }
@@ -756,14 +760,14 @@ void coolsfr::IonizeParamsUVB(void)
     }
     
     // Detailed debug output
-    if(ThisTask == 0 && All.UVBDebugLevel > 1)
+    if(ThisTask == 0 && All.CoolingDebugLevel > 1)
     {
-        mpi_printf("COOLING: UVB at z=%g (between table entries z=%g and z=%g):\n", 
+        COOLING_PRINT("COOLING: UVB at z=%g (between table entries z=%g and z=%g):\n", 
                  redshift, 
                  pow(10.0, PhotoTUVB[ilow].variable) - 1.0,
                  pow(10.0, PhotoTUVB[ilow+1].variable) - 1.0);
-        mpi_printf("  gJH0=%g, gJHe0=%g, gJHep=%g\n", pc.gJH0, pc.gJHe0, pc.gJHep);
-        mpi_printf("  epsH0=%g, epsHe0=%g, epsHep=%g\n", pc.epsH0, pc.epsHe0, pc.epsHep);
+        COOLING_PRINT("  gJH0=%g, gJHe0=%g, gJHep=%g\n", pc.gJH0, pc.gJHe0, pc.gJHep);
+        COOLING_PRINT("  epsH0=%g, epsHe0=%g, epsHep=%g\n", pc.epsH0, pc.epsHe0, pc.epsHep);
     }
 }
 
@@ -929,7 +933,7 @@ void coolsfr::MakeCoolingTable()
    
    // Safety check for negative or NaN internal energy
    if(utherm <= 0 || !gsl_finite(utherm)) {
-       printf("Warning: Invalid utherm=%g detected for particle %d, resetting to minimum\n", utherm, i);
+       COOLING_PRINT("Warning: Invalid utherm=%g detected for particle %d, resetting to minimum\n", utherm, i);
        
        // Calculate minimum energy and use it
        double ne = 1.0; // Assume fully ionized for safety
@@ -950,7 +954,7 @@ void coolsfr::MakeCoolingTable()
    
    // Safety check for Ne
    if(ne < 0 || ne > 2.0 || !gsl_finite(ne)) {
-       printf("Warning: Invalid Ne=%g detected for particle %d, resetting\n", ne, i);
+       COOLING_PRINT("Warning: Invalid Ne=%g detected for particle %d, resetting\n", ne, i);
        ne = 1.0; // Reset to a reasonable value
        Sp->SphP[i].Ne = ne;
    }
@@ -972,7 +976,7 @@ void coolsfr::MakeCoolingTable()
    double cooling_time = GetCoolingTime(safe_utherm, dens * All.cf_a3inv, &ne, gs, DoCool);
    if(cooling_time > 0 && dtime > 0.5 * cooling_time) {
        dtime = 0.5 * cooling_time;
-       printf("Limited cooling timestep for particle %d (t_cool=%g)\n", i, cooling_time);
+       COOLING_PRINT("Limited cooling timestep for particle %d (t_cool=%g)\n", i, cooling_time);
    }
    
    // Apply cooling with all safety measures in place
@@ -982,7 +986,7 @@ void coolsfr::MakeCoolingTable()
  
    // Additional validation of the result
    if(unew < 0 || !gsl_finite(unew)) {
-       printf("Warning: Invalid unew=%g after cooling for particle %d, using minimum\n", unew, i);
+       COOLING_PRINT("Warning: Invalid unew=%g after cooling for particle %d, using minimum\n", unew, i);
        unew = min_energy;
    }
  
@@ -990,7 +994,7 @@ void coolsfr::MakeCoolingTable()
  
    // Apply temperature floor based on MinGasTemp
    if(unew < min_energy) {
-      printf("Applying temperature floor: %g -> %g for particle %d\n", unew, min_energy, i);
+      COOLING_PRINT("Applying temperature floor: %g -> %g for particle %d\n", unew, min_energy, i);
       du = min_energy - utherm;
    }
  
