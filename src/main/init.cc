@@ -100,11 +100,22 @@ void sim::init(int RestartSnapNum)
      is empty for this particle type */
 
   for(int i = 0; i < Sp.NumPart; i++) {
-
-    #ifdef COOLING
-      for (int k = 0; k < 4; k++)    /* Initialize metal arrays to 0 */
-        Sp.SphP[i].Metals[k] = 0.0;
-    #endif
+    if(Sp.P[i].getType() == 0) { /* Gas particles */
+      #ifdef COOLING
+        /* Initialize metal arrays to small non-zero values */
+        Sp.SphP[i].Metals[0] = 1.0e-6;  /* Z - total metallicity */
+        Sp.SphP[i].Metals[1] = 3.0e-7;  /* C - carbon */
+        Sp.SphP[i].Metals[2] = 5.0e-7;  /* O - oxygen */
+        Sp.SphP[i].Metals[3] = 1.0e-7;  /* Fe - iron */
+        
+        /* Sync the scalar Metallicity with Metals[0] */
+        Sp.P[i].Metallicity = Sp.SphP[i].Metals[0];
+      #endif
+    }
+    else if(Sp.P[i].getType() == 4) { /* Star particles */
+      /* Initialize stellar metallicity to the same values */
+      Sp.P[i].Metallicity = 1.0e-6;
+    }
 
     if(All.MassTable[Sp.P[i].getType()] != 0)
       {

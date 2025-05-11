@@ -307,22 +307,28 @@ double coolsfr::get_starformation_rate(int i, double *xcloud, simparticles *Sp)
  */
 void coolsfr::create_star_particle(simparticles *Sp, int i, double prob, double rnd, double currentTemp)
 {
-
   if(rnd < prob)  /* Make a star */
     {
-
       // CONVERT GAS INTO A STAR
-      if(Sp->P[i].getMass() < 1.5 * All.TargetGasMass / GENERATIONS)  //GENERATIONS 4  /* Number of stars a gas particle may form */
+      if(Sp->P[i].getMass() < 1.5 * All.TargetGasMass / GENERATIONS)
         {
           // Convert the gas particle into a star
           Sp->P[i].setType(4);  // Change type to star
-      
-        #ifdef STELLARAGE
+          
+          // The scalar Metallicity should already be set correctly from the gas
+          // If it's not, ensure it's copied from Metals[0]
+          #ifdef COOLING
+          Sp->P[i].Metallicity = Sp->SphP[i].Metals[0];
+          #endif
+          
+          #ifdef STELLARAGE
           // Record stellar formation time
           Sp->P[i].StellarAge = All.Time;
-        #endif
-        }
+          #endif
 
+          // Initialize feedback flag to 0 (no feedback applied yet)
+          Sp->P[i].FeedbackFlag = 0;
+        }
       // SPAWN A NEW STAR PARTICLE
       else
         {
@@ -338,21 +344,29 @@ void coolsfr::create_star_particle(simparticles *Sp, int i, double prob, double 
           Sp->P[j] = Sp->P[i];  // Copy properties from parent
           Sp->P[j].setType(4);  // Set type to star
       
+          // Transfer metallicity from gas to star (in case it wasn't copied by Sp->P[j] = Sp->P[i])
+          #ifdef COOLING
+          Sp->P[j].Metallicity = Sp->SphP[i].Metals[0];
+          #endif
+          
           // Adjust masses
           Sp->P[j].setMass(All.TargetGasMass / GENERATIONS);
           Sp->P[i].setMass(pmass - Sp->P[j].getMass());
       
-        #ifdef STELLARAGE
+          #ifdef STELLARAGE
           // Record stellar formation time
           Sp->P[j].StellarAge = All.Time;
-        #endif
+          #endif
+
+          // Initialize feedback flag to 0 (no feedback applied yet)
+          Sp->P[j].FeedbackFlag = 0;
+          
           // Increment particle counter
           Sp->NumPart++;
-      }
+        }
 
-          STARFORMATION_PRINT("New star is born! id=%d, probability=%g, rand=%g, temp=%g, density=%g, PhysDensThresh=%g\n", 
-            Sp->P[i].ID.get(), prob, rnd, currentTemp, Sp->SphP[i].Density * All.cf_a3inv, All.PhysDensThresh);
-        
+        STARFORMATION_PRINT("New star is born! id=%d, probability=%g, rand=%g, temp=%g, density=%g, PhysDensThresh=%g\n", 
+          Sp->P[i].ID.get(), prob, rnd, currentTemp, Sp->SphP[i].Density * All.cf_a3inv, All.PhysDensThresh);
     }
 }
 

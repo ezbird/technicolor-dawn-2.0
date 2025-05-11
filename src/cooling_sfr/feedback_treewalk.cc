@@ -167,12 +167,15 @@ double TotalLostMetals_AGB[4] = {0.0};
      double w_dimless = kernel_weight_cubic_dimless(u);
      double w = (8.0 / (M_PI * h * h * h)) * w_dimless;
  
-     // Optional cap for stability
-     if (!isfinite(w) || w > 10.0 || w < 0.0) {
-         FEEDBACK_PRINT("WARNING! Kernel weight w=%.3e clipped for r=%.3e h=%.3e u=%.3e\n", w, r, h, u);
-         w = 0.0;
-     }
-     return w;
+    // Add some checks for stability
+    if (!isfinite(w) || w < 0.0) {
+        FEEDBACK_PRINT("WARNING! Kernel weight w=%.3e clipped for r=%.3e h=%.3e u=%.3e\n", w, r, h, u);
+        w = 0.0;
+    } else if (w > 10.0) {
+        FEEDBACK_PRINT("WARNING! Kernel weight w=%.3e capped at 10.0 for r=%.3e h=%.3e u=%.3e\n", w, r, h, u);
+        w = 10.0;  // Cap the weight rather than discard it
+    }
+    return w;
  }
   
  // Step function for Type II SNe (simpler, more direct energy deposition)
@@ -520,6 +523,9 @@ void redistribute_lost_feedback(simparticles *Sp) {
              mass_return = MASS_RETURN_AGB * stellar_mass;
              yields = get_AGB_yields(mass_return, metallicity);
              
+             FEEDBACK_PRINT("AGB yields for m=%g, Z=%g: Z=%g, C=%g, O=%g, Fe=%g\n", 
+               mass_return, metallicity, yields.Z, yields.C, yields.O, yields.Fe);
+
              // Update diagnostics
              ThisStepEnergy_AGB += E_total;
              TotalEnergyInjected_AGB += E_total;
@@ -625,7 +631,9 @@ void redistribute_lost_feedback(simparticles *Sp) {
                  double metal_frac = metals_add[k] / gas_mass;
                  Sp->SphP[j].Metals[k] += metal_frac;
              }
-             
+             // Also update the scalar Metallicity to match Metals[0]
+            Sp->P[j].Metallicity = Sp->SphP[j].Metals[0];
+
              // Final check for numerical stability
              double final_u = Sp->get_utherm_from_entropy(j);
              if (!isfinite(final_u) || final_u < 1e-20 || final_u > 1e10) {
@@ -948,10 +956,28 @@ void redistribute_lost_feedback(simparticles *Sp) {
                     TotalLostMetals_SNII[3] += yields.Fe;
                 }
                 else if (feedback_type == FEEDBACK_AGB) {
-                    // Similar tracking for AGB...
+                    double energy_lost = AGB_ENERGY_PER_MASS * stellar_mass;
+                    double mass_lost = MASS_RETURN_AGB * stellar_mass;
+                    Yields yields = get_AGB_yields(mass_lost, metallicity);
+                    
+                    TotalLostEnergy_AGB += energy_lost;
+                    TotalLostMass_AGB += mass_lost;
+                    TotalLostMetals_AGB[0] += yields.Z;
+                    TotalLostMetals_AGB[1] += yields.C;
+                    TotalLostMetals_AGB[2] += yields.O;
+                    TotalLostMetals_AGB[3] += yields.Fe;
                 }
                 else if (feedback_type == FEEDBACK_SNIa) {
-                    // Similar tracking for SNIa...
+                    double energy_lost = SNIa_ENERGY_PER_EVENT * snia_events;
+                    double mass_lost = 0.003 * stellar_mass * snia_events;
+                    Yields yields = get_SNIa_yields(snia_events);
+                    
+                    TotalLostEnergy_SNIa += energy_lost;
+                    TotalLostMass_SNIa += mass_lost;
+                    TotalLostMetals_SNIa[0] += yields.Z;
+                    TotalLostMetals_SNIa[1] += yields.C;
+                    TotalLostMetals_SNIa[2] += yields.O;
+                    TotalLostMetals_SNIa[3] += yields.Fe;
                 }
             }
             
