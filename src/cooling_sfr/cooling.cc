@@ -278,7 +278,7 @@ void coolsfr::find_abundances_and_rates(double logT, double rho, double *ne_gues
   double ne_input   = *ne_guess;
 
   if(!gsl_finite(logT)) {
-      COOLING_PRINT(stderr, "Warning: find_abundances called with logT=%g → clamping to [%g,%g]\n",logT, Tmin, Tmax);
+      COOLING_PRINT("Warning: find_abundances called with logT=%g → clamping to [%g,%g]\n",logT, Tmin, Tmax);
       logT = std::min(std::max(logT_input, Tmin), Tmax);
   }
 
