@@ -149,14 +149,14 @@ CoolingDebugLevel        0     % Prints Cooling and UVB activity (0=none, 1=basi
 %DustVelocityScaling 1.0       # Velocity factor for dust
 
 %---- NGENIC Parameters (used ONLY when compiled with NGENIC)
-NSample                     64             % Grid size - set same as NGENIC in Config.sh
-GridSize                    64
-PowerSpectrumFile           empty.txt      % ICs/fixed_power_spectrum.txt
-PowerSpectrumType           1
-Sigma8                      0.811
-ReNormalizeInputSpectrum    1               % Apply Sigma8 normalization
-PrimordialIndex             0.965
-Seed                        123456
-SphereMode                  0
-InputSpectrum_UnitLength_in_cm 3.085678e21
-ShapeGamma                  0.21
+%NSample                     64             % Grid size - set same as NGENIC in Config.sh
+%GridSize                    64
+%PowerSpectrumFile           empty.txt      % ICs/fixed_power_spectrum.txt
+%PowerSpectrumType           1
+%Sigma8                      0.811
+%ReNormalizeInputSpectrum    1               % Apply Sigma8 normalization
+%PrimordialIndex             0.965
+%Seed                        123456
+%SphereMode                  0
+%InputSpectrum_UnitLength_in_cm 3.085678e21
+%ShapeGamma                  0.21
