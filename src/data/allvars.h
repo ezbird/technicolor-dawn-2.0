@@ -343,7 +343,7 @@ struct global_data_all_processes : public parameters
   int LimitVelocitiesOnlyForGas;
   double MaxAllowedVelocity;
 
-  int StarformationMode;
+  //int StarformationMode;
   double MetalYield;
 
   int FeedbackDebugLevel;         /* Print detailed diagnostics (0=no, 1=yes) */

@@ -190,7 +190,7 @@ void global_data_all_processes::register_parameters(void)
   add_param("MaxSfrTimescale", &MaxSfrTimescale, PARAM_DOUBLE, PARAM_FIXED);
   add_param("MaxStarFormationTemp", &MaxStarFormationTemp, PARAM_DOUBLE, PARAM_FIXED);
   add_param("MetalYield", &MetalYield, PARAM_DOUBLE, PARAM_FIXED);
-  add_param("StarformationMode", &StarformationMode, PARAM_INT, PARAM_FIXED);
+  //add_param("StarformationMode", &StarformationMode, PARAM_INT, PARAM_FIXED);
   add_param("TargetGasMass", &TargetGasMass, PARAM_DOUBLE, PARAM_FIXED);
   
   add_param("WindEfficiency", &WindEfficiency, PARAM_DOUBLE, PARAM_FIXED);
