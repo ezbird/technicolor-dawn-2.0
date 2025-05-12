@@ -52,6 +52,8 @@ std::vector<double> g_h_per_star;
 std::vector<double> g_energy_ratio;
 std::vector<std::string> g_neighbor_feedback_type;  // Type of feedback for each neighbor
 std::vector<std::string> g_star_feedback_type;      // Type of feedback for each star event
+std::vector<double> g_neighbor_time;  // Simulation time for each neighbor event
+std::vector<double> g_star_time;      // Simulation time for each star event
 
 // If no place for feedback is found, these variables will be used to track
 // those events and redistribute the energy and metals later.
@@ -1094,11 +1096,6 @@ void OutputFeedbackDiagnostics()
     g_neighbor_time.clear();
     g_star_time.clear();
 }
-
-// Optional: Add time tracking for feedback events
-// Add these to your global vectors
-std::vector<double> g_neighbor_time;  // Simulation time for each neighbor event
-std::vector<double> g_star_time;      // Simulation time for each star event
 
 // Then update your recording functions:
 void RecordNeighborFeedback(double delta_u, double delta_v, double rel_increase, 
