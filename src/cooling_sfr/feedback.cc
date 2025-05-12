@@ -50,6 +50,8 @@ std::vector<double> g_radial_r;
 std::vector<int>    g_neighbors_per_star;
 std::vector<double> g_h_per_star;
 std::vector<double> g_energy_ratio;
+std::vector<std::string> g_neighbor_feedback_type;  // Type of feedback for each neighbor
+std::vector<std::string> g_star_feedback_type;      // Type of feedback for each star event
 
 // If no place for feedback is found, these variables will be used to track
 // those events and redistribute the energy and metals later.
@@ -1015,10 +1017,10 @@ void redistribute_lost_feedback(simparticles *Sp) {
 /** \brief Write out detailed feedback diagnostics to CSV for plotting
  *
  *  This routine dumps both per-neighbor and per-star metrics into a CSV
- *  file with columns: delta_u, delta_v, rel_inc, r, n_ngb, h_star, E_ratio.
- *  Neighbors have values in the first four columns; stars in the last three.
+ *  file with columns: delta_u, delta_v, rel_inc, r, n_ngb, h_star, E_ratio, feedback_type.
+ *  Neighbors have values in the first four columns; stars in the last four.
  */
- void OutputFeedbackDiagnostics()
+void OutputFeedbackDiagnostics()
 {
     if (ThisTask != 0)
         return;
@@ -1052,38 +1054,34 @@ void redistribute_lost_feedback(simparticles *Sp) {
         }
         out << std::scientific << std::setprecision(6);
 
-        // Write header once
+ // Update header
         out << "# Feedback diagnostics at time=" << All.Time << "\n";
-        out << "#delta_u,delta_v,rel_inc,r,n_ngb,h_star,E_ratio\n";
-    } else {
-        out.open("feedback_diagnostics.csv", std::ios::app);
-        if (!out.is_open()) {
-            std::fprintf(stderr,
-                "[Error] Could not open feedback_diagnostics.csv for appending\n");
-            return;
-        }
-        out << std::scientific << std::setprecision(6);
+        out << "#delta_u,delta_v,rel_inc,r,n_ngb,h_star,E_ratio,feedback_type,time\n";
     }
-
-    // 1) Neighbor metrics: delta_u, delta_v, rel_inc, r (stars blank)
+    
+    // 1) Neighbor metrics with time
     for (size_t k = 0; k < g_delta_u.size(); ++k) {
         out << g_delta_u[k]      << ","
             << g_delta_v[k]      << ","
             << g_rel_increase[k] << ","
-            << g_radial_r[k]     << ",,,\n";
+            << g_radial_r[k]     << ",,,"
+            << "," << g_neighbor_feedback_type[k] << ","
+            << g_neighbor_time[k] << "\n";
     }
 
-    // 2) Star metrics: first four fields blank, then n_ngb, h_star, E_ratio
+    // 2) Star metrics with time
     for (size_t k = 0; k < g_neighbors_per_star.size(); ++k) {
         out << ",,,,"
             << g_neighbors_per_star[k] << ","
             << g_h_per_star[k]         << ","
-            << g_energy_ratio[k]       << "\n";
+            << g_energy_ratio[k]       << ","
+            << g_star_feedback_type[k] << ","
+            << g_star_time[k]          << "\n";
     }
 
     out.close();
 
-    // Now that everything’s safely on disk, clear the in‑memory buffers:
+    // Now that everything's safely on disk, clear the in‑memory buffers:
     g_delta_u.clear();
     g_delta_v.clear();
     g_rel_increase.clear();
@@ -1091,7 +1089,41 @@ void redistribute_lost_feedback(simparticles *Sp) {
     g_neighbors_per_star.clear();
     g_h_per_star.clear();
     g_energy_ratio.clear();
+    g_neighbor_feedback_type.clear();
+    g_star_feedback_type.clear();
+    g_neighbor_time.clear();
+    g_star_time.clear();
 }
 
+// Optional: Add time tracking for feedback events
+// Add these to your global vectors
+std::vector<double> g_neighbor_time;  // Simulation time for each neighbor event
+std::vector<double> g_star_time;      // Simulation time for each star event
+
+// Then update your recording functions:
+void RecordNeighborFeedback(double delta_u, double delta_v, double rel_increase, 
+                           double radial_distance, const char* feedback_type)
+{
+    if (ThisTask == 0) {
+        g_delta_u.push_back(delta_u);
+        g_delta_v.push_back(delta_v);
+        g_rel_increase.push_back(rel_increase);
+        g_radial_r.push_back(radial_distance);
+        g_neighbor_feedback_type.push_back(feedback_type);
+        g_neighbor_time.push_back(All.Time);  // Add current simulation time
+    }
+}
+
+void RecordStarFeedback(int n_neighbors, double h_kernel, double energy_ratio, 
+                        const char* feedback_type)
+{
+    if (ThisTask == 0) {
+        g_neighbors_per_star.push_back(n_neighbors);
+        g_h_per_star.push_back(h_kernel);
+        g_energy_ratio.push_back(energy_ratio);
+        g_star_feedback_type.push_back(feedback_type);
+        g_star_time.push_back(All.Time);  // Add current simulation time
+    }
+}
  
  #endif // FEEDBACK
