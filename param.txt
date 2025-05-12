@@ -119,7 +119,7 @@ WindFreeTravelLength  20
 WindFreeTravelDensFac 0.1
 
 %----- Star formation
-StarformationMode     1
+%StarformationMode     1
 MetalYield            0.02
 MaxSfrTimescale       2.7        % usually 1.5; Gas consumption timescale (multi-phase model)
 MaxStarFormationTemp  15000      % only form stars where T < 15000 K

@@ -776,9 +776,10 @@ void redistribute_lost_feedback(simparticles *Sp) {
                       ThisStepMetalsInjected[2], ThisStepMetalsInjected[3]);
     }
     redistribute_lost_feedback(Sp);
-    #ifdef FEEDBACK_PRINT
+
+    if(All.FeedbackDebugLevel)
         OutputFeedbackDiagnostics();  // Output diagnostics after processing this feedback type
-    #endif
+
 }
 
 /**
