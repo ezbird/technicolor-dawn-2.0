@@ -6,8 +6,6 @@ start_total=$(date +%s)
 echo "[runGadget] Resetting output directory..."
 start=$(date +%s)
 rm -r output
-#rm eos.txt
-#rm sfrrate.txt
 end=$(date +%s)
 echo "[runGadget] Output reset took $((end - start)) seconds."
 
@@ -30,15 +28,15 @@ echo "[runGadget] Build took $((end - start)) seconds."
 echo "[runGadget] Running Gadget..."
 start=$(date +%s)
 mpirun -np 4 ./Gadget4 param.txt | tee output.log
-#mpirun -np 4 ./Gadget4 param.txt
 end=$(date +%s)
 echo "[runGadget] Gadget run took $((end - start)) seconds."
 
 # make output animations
 echo "[runGadget] Generating output animations..."
 start=$(date +%s)
-#python3 plotOutputAnimation.py
-#python3 plotFeedbackMap.py
+python3 plotOutputFrames.py
+python3 plot_Rho_vs_T.py
+python3 plotFeedbackMap.py
 end=$(date +%s)
 echo "[runGadget] Animation scripts took $((end - start)) seconds."
 

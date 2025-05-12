@@ -133,8 +133,8 @@ PhysDensThresh        0.0        % this gets set at runtime in coolsfr::set_unit
 TargetGasMass         1.0e5      # Target gas particle mass in code units
 
 % ------ Feedback
-FeedbackSNII          0     % Enable Type II supernova feedback (0=off, 1=on)
-FeedbackSNIa          0     % Enable Type Ia supernova feedback (0=off, 1=on)
+FeedbackSNII          1     % Enable Type II supernova feedback (0=off, 1=on)
+FeedbackSNIa          1     % Enable Type Ia supernova feedback (0=off, 1=on)
 FeedbackAGB           1     % Enable AGB stellar winds feedback (0=off, 1=on)
 
 %----- Debugging

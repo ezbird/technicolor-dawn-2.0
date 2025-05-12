@@ -30,12 +30,28 @@
 #include "../system/system.h"
 #include "../time_integration/timestep.h"
 #include "../cooling_sfr/cooling.h"
+#include "../cooling_sfr/starformation.h"
 
 //#define eV_to_K 11604.505  // Conversion factor from eV to Kelvin
 
  // Debug output function
  #define STARFORMATION_PRINT(...) \
      do { if (All.StarFormationDebugLevel) printf("[STARFORMATION] " __VA_ARGS__); } while (0)
+
+
+/*! \brief Finalize star formation module
+ *
+ *  This function closes the star formation log file
+ *  when the simulation ends.
+ */
+void end_starformation(void)
+{
+  TIMER_START(CPU_MISC);
+
+  printf("STARFORMATION: Ending star formation module...\n");
+
+  TIMER_STOP(CPU_MISC);
+}
 
 /**
  * Set up units for the star formation code

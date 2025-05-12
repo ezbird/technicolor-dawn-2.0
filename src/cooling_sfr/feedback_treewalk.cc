@@ -776,7 +776,9 @@ void redistribute_lost_feedback(simparticles *Sp) {
                       ThisStepMetalsInjected[2], ThisStepMetalsInjected[3]);
     }
     redistribute_lost_feedback(Sp);
-    OutputFeedbackDiagnostics();  // Output diagnostics after processing this feedback type
+    #ifdef FEEDBACK_PRINT
+        OutputFeedbackDiagnostics();  // Output diagnostics after processing this feedback type
+    #endif
 }
 
 /**
@@ -796,11 +798,24 @@ void redistribute_lost_feedback(simparticles *Sp) {
             n_sources++;
     }
     
+    // Static counter for reduced print verbosity
+    static int no_sources_counter[3] = {0, 0, 0};  // One for each feedback type
+    int type_idx = 0;
+    if (feedback_type == FEEDBACK_SNII) type_idx = 1;
+    else if (feedback_type == FEEDBACK_SNIa) type_idx = 2;
+    else if (feedback_type == FEEDBACK_AGB) type_idx = 3;
+    
     if (ThisTask == 0) {
         if (n_sources == 0) {
-            FEEDBACK_PRINT("No eligible sources for %s feedback\n", feedback_name);
+            // Print message only occasionally
+            if (no_sources_counter[type_idx]++ % 100 == 0) {
+                FEEDBACK_PRINT("No eligible sources for %s feedback (counter=%d)\n", 
+                              feedback_name, no_sources_counter[type_idx]);
+            }
             return;
         } else {
+            // Reset counter when we find sources
+            no_sources_counter[type_idx] = 0;
             FEEDBACK_PRINT("Found %d eligible sources for %s feedback\n", n_sources, feedback_name);
         }
     }
@@ -1006,6 +1021,16 @@ void redistribute_lost_feedback(simparticles *Sp) {
 {
     if (ThisTask != 0)
         return;
+
+    // Skip diagnostic output if there's nothing to report
+    if (g_delta_u.size() == 0 && g_neighbors_per_star.size() == 0) {
+        // Optional: Print a less frequent message instead
+        static int counter = 0;
+        if (counter++ % 100 == 0) {  // Only print every 100th call
+            fprintf(stderr, "[FeedbackDiag] No feedback activity yet (time=%g)\n", All.Time);
+        }
+        return;
+    }
 
     // Report sizes of diagnostics arrays
     std::fprintf(stderr,
