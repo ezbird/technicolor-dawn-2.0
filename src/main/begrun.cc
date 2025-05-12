@@ -23,7 +23,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "../cooling_sfr/starformation.h"
 #include "../cooling_sfr/cooling.h"
 #include "../data/allvars.h"
 #include "../data/dtypes.h"

@@ -22,7 +22,7 @@
 #include <unistd.h>
 
 #include "../cooling_sfr/cooling.h"
-#include "../cooling_sfr/feedback_treewalk.h"
+#include "../cooling_sfr/feedback.h"
 #include "../data/allvars.h"
 #include "../data/dtypes.h"
 #include "../data/mymalloc.h"
