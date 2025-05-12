@@ -1,10 +1,4 @@
-/*******************************************************************************
- * \copyright   This file is part of the GADGET4 N-body/SPH code developed
- * \copyright   by Volker Springel. Copyright (C) 2014-2020 by Volker Springel
- * \copyright   (vspringel@mpa-garching.mpg.de) and all contributing authors.
- *******************************************************************************/
-
-/*! \file coolsfr_impl.cc
+/*! \file starformation.cc
  *
  *  \brief Implements star formation and related routines based on the effective multi-phase model
  */
@@ -30,9 +24,6 @@
 #include "../system/system.h"
 #include "../time_integration/timestep.h"
 #include "../cooling_sfr/cooling.h"
-#include "../cooling_sfr/starformation.h"
-
-//#define eV_to_K 11604.505  // Conversion factor from eV to Kelvin
 
  // Debug output function
  #define STARFORMATION_PRINT(...) \
