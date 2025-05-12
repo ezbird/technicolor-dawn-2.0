@@ -52,6 +52,7 @@ std::vector<double> g_h_per_star;
 std::vector<double> g_energy_ratio;
 std::vector<std::string> g_neighbor_feedback_type;  // Type of feedback for each neighbor
 std::vector<std::string> g_star_feedback_type;      // Type of feedback for each star event
+
 std::vector<double> g_neighbor_time;  // Simulation time for each neighbor event
 std::vector<double> g_star_time;      // Simulation time for each star event
 
@@ -494,172 +495,191 @@ void redistribute_lost_feedback(simparticles *Sp) {
          }
      }
  
-     // Apply feedback to all found targets
-     void ApplyFeedback(double stellar_mass, double metallicity, int snia_events) {
-         if (TargetCount == 0)
-             return;
- 
-         // Calculate feedback properties based on type
-         double E_total = 0;
-         double mass_return = 0;
-         Yields yields = {0};
- 
-         if (FeedbackType == FEEDBACK_SNII) {
-             E_total = SNII_ENERGY_PER_MASS * stellar_mass;
-             mass_return = MASS_RETURN_SNII * stellar_mass;
-             yields = get_SNII_yields(mass_return, metallicity);
-             
-             // Update diagnostics
-             ThisStepEnergy_SNII += E_total;
-             TotalEnergyInjected_SNII += E_total;
-         }
-         else if (FeedbackType == FEEDBACK_SNIa) {
-             E_total = SNIa_ENERGY_PER_EVENT * snia_events;
-             mass_return = 0.003 * stellar_mass * snia_events;  // Approximate mass per SNIa
-             yields = get_SNIa_yields(snia_events);
-             
-             // Update diagnostics
-             ThisStepEnergy_SNIa += E_total;
-             TotalEnergyInjected_SNIa += E_total;
-         }
-         else if (FeedbackType == FEEDBACK_AGB) {
-             E_total = AGB_ENERGY_PER_MASS * stellar_mass;
-             mass_return = MASS_RETURN_AGB * stellar_mass;
-             yields = get_AGB_yields(mass_return, metallicity);
-             
-             FEEDBACK_PRINT("AGB yields for m=%g, Z=%g: Z=%g, C=%g, O=%g, Fe=%g\n", 
-               mass_return, metallicity, yields.Z, yields.C, yields.O, yields.Fe);
 
-             // Update diagnostics
-             ThisStepEnergy_AGB += E_total;
-             TotalEnergyInjected_AGB += E_total;
-         }
- 
-         double E_input = E_total;                    // ← total energy budget for this star
-         double sum_applied = 0.0;                    // ← will accumulate what we actually give out
+// Apply feedback to all found targets
+void ApplyFeedback(double stellar_mass, double metallicity, int snia_events) {
+    if (TargetCount == 0)
+        return;
 
-         // Update mass return diagnostics
-         ThisStepMassReturned += mass_return;
-         TotalMassReturned += mass_return;
-         
-         // Update metals diagnostics
-         ThisStepMetalsInjected[0] += yields.Z;
-         ThisStepMetalsInjected[1] += yields.C;
-         ThisStepMetalsInjected[2] += yields.O;
-         ThisStepMetalsInjected[3] += yields.Fe;
- 
-         // Calculate normalization factor
-         double total_weight = 0;
-         for (int i = 0; i < TargetCount; i++)
-             total_weight += Targets[i].weight;
-             
-         if (total_weight <= 0) {
-             FEEDBACK_PRINT("WARNING! Total weight <= 0, skipping feedback application\n");
-             return;
-         }
-         
-         double inv_total_weight = 1.0 / total_weight;
-         
-         // Energy partitioning
-         double E_kin = E_total * SNKickFraction;
-         double E_therm = E_total * (1.0 - SNKickFraction);
+    // Get feedback type as string for diagnostics
+    std::string feedback_type_str;
+    if (FeedbackType == FEEDBACK_SNII)
+        feedback_type_str = "SNII";
+    else if (FeedbackType == FEEDBACK_SNIa)
+        feedback_type_str = "SNIa";
+    else if (FeedbackType == FEEDBACK_AGB)
+        feedback_type_str = "AGB";
+    else
+        feedback_type_str = "Unknown";
 
-         // Apply feedback to each target
-         for (int i = 0; i < TargetCount; i++) {
-             int j = Targets[i].index;
-             
-             // Skip invalid particles
-             if (j < 0 || j >= Sp->NumPart || Sp->P[j].getType() != 0)
-                 continue;
-                 
-             // Calculate normalized weight for this particle
-             double norm_weight = Targets[i].weight * inv_total_weight;
-             
-             // Thermal energy injection
-             double gas_mass = Sp->P[j].getMass();
-             double gas_mass_cgs = gas_mass * All.UnitMass_in_g;
-             double inv_mass_cgs = 1.0 / gas_mass_cgs;
-             double E_therm_j = E_therm * norm_weight;
-             double delta_u = E_therm_j * erg_per_mass_to_code * inv_mass_cgs;
-             
-             // accumulate for per‐star energy‐conservation check
-             sum_applied += E_therm_j;
+    // Calculate feedback properties based on type
+    double E_total = 0;
+    double mass_return = 0;
+    Yields yields = {0};
 
-             // Check for valid energy increment
-             if (!isfinite(delta_u) || delta_u < 0) {
-                 FEEDBACK_PRINT("WARNING! Non-finite delta_u = %.3e for gas %d\n", delta_u, j);
-                 continue;
-             }
-             
-             // Apply thermal energy with clamping
-             double utherm_before = Sp->get_utherm_from_entropy(j);
-             double rel_increase = delta_u / (utherm_before + 1e-10);
-             
-             if (rel_increase > 10.0) {
-                 FEEDBACK_PRINT("WARNING! delta_u (%.3e) is too large (%.1fx u_before=%.3e) for gas ID=%llu\n", 
-                               delta_u, rel_increase, utherm_before, (unsigned long long)Sp->P[j].ID.get());
-                 continue;
-             }
-             
-             double utherm_after = clamp_feedback_energy(utherm_before, delta_u, j, Sp->P[j].ID.get());
-             Sp->set_entropy_from_utherm(utherm_after, j);
-             
-             // Kinetic energy injection
-             double E_kin_j = E_kin * norm_weight;
-             double v_kick = sqrt(2.0 * E_kin_j * erg_per_mass_to_code * inv_mass_cgs);
-             
-             if (!isfinite(v_kick) || v_kick < 0 || v_kick > 1e5) {
-                 FEEDBACK_PRINT("WARNING! Non-finite or huge v_kick = %.3e for gas %d\n", v_kick, j);
-                 continue;
-             }
-             
-             // Apply kick along the unit vector from star to gas
-             for (int k = 0; k < 3; k++)
-                 Sp->P[j].Vel[k] += v_kick * Targets[i].dir[k];
-                 
-             sum_applied += E_kin_j;  // for diagnostics
+    if (FeedbackType == FEEDBACK_SNII) {
+        E_total = SNII_ENERGY_PER_MASS * stellar_mass;
+        mass_return = MASS_RETURN_SNII * stellar_mass;
+        yields = get_SNII_yields(mass_return, metallicity);
+        
+        // Update diagnostics
+        ThisStepEnergy_SNII += E_total;
+        TotalEnergyInjected_SNII += E_total;
+    }
+    else if (FeedbackType == FEEDBACK_SNIa) {
+        E_total = SNIa_ENERGY_PER_EVENT * snia_events;
+        mass_return = 0.003 * stellar_mass * snia_events;  // Approximate mass per SNIa
+        yields = get_SNIa_yields(snia_events);
+        
+        // Update diagnostics
+        ThisStepEnergy_SNIa += E_total;
+        TotalEnergyInjected_SNIa += E_total;
+    }
+    else if (FeedbackType == FEEDBACK_AGB) {
+        E_total = AGB_ENERGY_PER_MASS * stellar_mass;
+        mass_return = MASS_RETURN_AGB * stellar_mass;
+        yields = get_AGB_yields(mass_return, metallicity);
+        
+        FEEDBACK_PRINT("AGB yields for m=%g, Z=%g: Z=%g, C=%g, O=%g, Fe=%g\n", 
+            mass_return, metallicity, yields.Z, yields.C, yields.O, yields.Fe);
 
-             // Mass return
-             double mass_add = mass_return * norm_weight;
-             Sp->P[j].setMass(gas_mass + mass_add);
-             
-             // Metal enrichment
-             double metals_add[4] = {
-                 yields.Z * norm_weight,
-                 yields.C * norm_weight,
-                 yields.O * norm_weight,
-                 yields.Fe * norm_weight
-             };
-             
-             for (int k = 0; k < 4; k++) {
-                 double metal_frac = metals_add[k] / gas_mass;
-                 Sp->SphP[j].Metals[k] += metal_frac;
-             }
-             // Also update the scalar Metallicity to match Metals[0]
-            Sp->P[j].Metallicity = Sp->SphP[j].Metals[0];
+        // Update diagnostics
+        ThisStepEnergy_AGB += E_total;
+        TotalEnergyInjected_AGB += E_total;
+    }
 
-             // Final check for numerical stability
-             double final_u = Sp->get_utherm_from_entropy(j);
-             if (!isfinite(final_u) || final_u < 1e-20 || final_u > 1e10) {
-                 FEEDBACK_PRINT("WARNING! Bad final entropy on gas %d: u=%.3e\n", j, final_u);
-             }
+    double E_input = E_total;                    // ← total energy budget for this star
+    double sum_applied = 0.0;                    // ← will accumulate what we actually give out
 
-            // ─── DIAG: per‐neighbor record ───
-            double rel_inc = delta_u / (Sp->get_utherm_from_entropy(j) + 1e-10);
-            g_delta_u    .push_back(delta_u);
+    // Update mass return diagnostics
+    ThisStepMassReturned += mass_return;
+    TotalMassReturned += mass_return;
+    
+    // Update metals diagnostics
+    ThisStepMetalsInjected[0] += yields.Z;
+    ThisStepMetalsInjected[1] += yields.C;
+    ThisStepMetalsInjected[2] += yields.O;
+    ThisStepMetalsInjected[3] += yields.Fe;
+
+    // Calculate normalization factor
+    double total_weight = 0;
+    for (int i = 0; i < TargetCount; i++)
+        total_weight += Targets[i].weight;
+        
+    if (total_weight <= 0) {
+        FEEDBACK_PRINT("WARNING! Total weight <= 0, skipping feedback application\n");
+        return;
+    }
+    
+    double inv_total_weight = 1.0 / total_weight;
+    
+    // Energy partitioning
+    double E_kin = E_total * SNKickFraction;
+    double E_therm = E_total * (1.0 - SNKickFraction);
+
+    // Apply feedback to each target
+    for (int i = 0; i < TargetCount; i++) {
+        int j = Targets[i].index;
+        
+        // Skip invalid particles
+        if (j < 0 || j >= Sp->NumPart || Sp->P[j].getType() != 0)
+            continue;
+            
+        // Calculate normalized weight for this particle
+        double norm_weight = Targets[i].weight * inv_total_weight;
+        
+        // Thermal energy injection
+        double gas_mass = Sp->P[j].getMass();
+        double gas_mass_cgs = gas_mass * All.UnitMass_in_g;
+        double inv_mass_cgs = 1.0 / gas_mass_cgs;
+        double E_therm_j = E_therm * norm_weight;
+        double delta_u = E_therm_j * erg_per_mass_to_code * inv_mass_cgs;
+        
+        // accumulate for per‐star energy‐conservation check
+        sum_applied += E_therm_j;
+
+        // Check for valid energy increment
+        if (!isfinite(delta_u) || delta_u < 0) {
+            FEEDBACK_PRINT("WARNING! Non-finite delta_u = %.3e for gas %d\n", delta_u, j);
+            continue;
+        }
+        
+        // Apply thermal energy with clamping
+        double utherm_before = Sp->get_utherm_from_entropy(j);
+        double rel_increase = delta_u / (utherm_before + 1e-10);
+        
+        if (rel_increase > 10.0) {
+            FEEDBACK_PRINT("WARNING! delta_u (%.3e) is too large (%.1fx u_before=%.3e) for gas ID=%llu\n", 
+                        delta_u, rel_increase, utherm_before, (unsigned long long)Sp->P[j].ID.get());
+            continue;
+        }
+        
+        double utherm_after = clamp_feedback_energy(utherm_before, delta_u, j, Sp->P[j].ID.get());
+        Sp->set_entropy_from_utherm(utherm_after, j);
+        
+        // Kinetic energy injection
+        double E_kin_j = E_kin * norm_weight;
+        double v_kick = sqrt(2.0 * E_kin_j * erg_per_mass_to_code * inv_mass_cgs);
+        
+        if (!isfinite(v_kick) || v_kick < 0 || v_kick > 1e5) {
+            FEEDBACK_PRINT("WARNING! Non-finite or huge v_kick = %.3e for gas %d\n", v_kick, j);
+            continue;
+        }
+        
+        // Apply kick along the unit vector from star to gas
+        for (int k = 0; k < 3; k++)
+            Sp->P[j].Vel[k] += v_kick * Targets[i].dir[k];
+            
+        sum_applied += E_kin_j;  // for diagnostics
+
+        // Mass return
+        double mass_add = mass_return * norm_weight;
+        Sp->P[j].setMass(gas_mass + mass_add);
+        
+        // Metal enrichment
+        double metals_add[4] = {
+            yields.Z * norm_weight,
+            yields.C * norm_weight,
+            yields.O * norm_weight,
+            yields.Fe * norm_weight
+        };
+        
+        for (int k = 0; k < 4; k++) {
+            double metal_frac = metals_add[k] / gas_mass;
+            Sp->SphP[j].Metals[k] += metal_frac;
+        }
+        // Also update the scalar Metallicity to match Metals[0]
+        Sp->P[j].Metallicity = Sp->SphP[j].Metals[0];
+
+        // Final check for numerical stability
+        double final_u = Sp->get_utherm_from_entropy(j);
+        if (!isfinite(final_u) || final_u < 1e-20 || final_u > 1e10) {
+            FEEDBACK_PRINT("WARNING! Bad final entropy on gas %d: u=%.3e\n", j, final_u);
+        }
+
+        // Record neighbor-specific diagnostic information with feedback type
+        if (ThisTask == 0) {
+            g_delta_u.push_back(delta_u);
             g_delta_v.push_back(v_kick);
-            g_rel_increase.push_back(rel_inc);
-            g_radial_r   .push_back(Targets[i].dist);
-         }
-         
-            // ─── DIAG: per‐star record ───
-            g_neighbors_per_star.push_back(TargetCount);
-            g_h_per_star         .push_back(SearchRadius);
-            g_energy_ratio      .push_back(sum_applied / E_input);
+            g_rel_increase.push_back(rel_increase);
+            g_radial_r.push_back(Targets[i].dist);
+            g_neighbor_feedback_type.push_back(feedback_type_str);
+            g_neighbor_time.push_back(All.Time);
+        }
+    }
+    
+    // Record star-specific diagnostic information with feedback type
+    if (ThisTask == 0) {
+        g_neighbors_per_star.push_back(TargetCount);
+        g_h_per_star.push_back(SearchRadius);
+        g_energy_ratio.push_back(sum_applied / E_input);
+        g_star_feedback_type.push_back(feedback_type_str);
+        g_star_time.push_back(All.Time);
+    }
 
-         // Mark this star as having received this type of feedback
-         Sp->P[StellarIndex].FeedbackFlag |= FeedbackType;
-     }
+    // Mark this star as having received this type of feedback
+    Sp->P[StellarIndex].FeedbackFlag |= FeedbackType;
+}
  
      // Public variables
      int TargetCount;
