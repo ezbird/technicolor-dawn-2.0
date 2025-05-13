@@ -11,6 +11,9 @@
 
 #ifdef DUST
 
+ #include "../data/simparticles.h"
+ #include "../mpi_utils/setcomm.h"
+ 
 // Add to sphparticledata in dtypes.h
 struct dust_data {
     double DustMass;      // Total dust mass
