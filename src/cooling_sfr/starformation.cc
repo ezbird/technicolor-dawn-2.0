@@ -531,6 +531,19 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
   double glob_totsfr;
   MPI_Allreduce(&total_sfr, &glob_totsfr, 1, MPI_DOUBLE, MPI_SUM, Communicator);
   
+ // Periodically log SFR to file "sfr.txt"
+  static double last_sfr_log_time = 0.0;
+  double sfr_log_interval = 0.01;  // Log every 0.01 in scale factor, adjust as needed
+  
+  if(All.Time - last_sfr_log_time >= sfr_log_interval)
+    {
+      // Call the SFR logging function
+      log_sfr();
+      
+      // Update the last log time
+      last_sfr_log_time = All.Time;
+    }
+
   TIMER_STOP(CPU_COOLING_SFR);
 }
 
@@ -852,6 +865,63 @@ void coolsfr::rearrange_particle_sequence(simparticles *Sp)
     printf("COOLSFR: Rearranged %d particles after star formation.\n", swap_count);
 }
 
+// Add this function to starformation.cc
+
+/**
+ * Write current star formation rate to sfr.txt
+ * This version should be called periodically during the simulation.
+ */
+void coolsfr::log_sfr(void)
+{
+  if(ThisTask == 0 && FdSfr)
+    {
+      double z = 1.0 / All.Time - 1.0;
+      double boxsize_in_mpc = All.BoxSize / 1000.0; // Convert from kpc to Mpc
+      double volume = pow(boxsize_in_mpc, 3.0);
+      
+      // Collect global SFR data
+      double totalSFR = 0;
+      double totalGasMass = 0;
+      int nSFParticles = 0;
+      
+      // Collect per-task SFR information
+      double local_sfr = 0;
+      double local_gas_mass = 0;
+      int local_sf_count = 0;
+      
+      // Sum up from all star-forming gas cells
+      for (int i = 0; i < Sp->NumGas; i++)
+        {
+          if (Sp->SphP[i].Sfr > 0)
+            {
+              local_sfr += Sp->SphP[i].Sfr;
+              local_gas_mass += Sp->P[i].getMass();
+              local_sf_count++;
+            }
+        }
+      
+      // Gather data from all MPI tasks
+      MPI_Reduce(&local_sfr, &totalSFR, 1, MPI_DOUBLE, MPI_SUM, 0, Communicator);
+      MPI_Reduce(&local_gas_mass, &totalGasMass, 1, MPI_DOUBLE, MPI_SUM, 0, Communicator);
+      MPI_Reduce(&local_sf_count, &nSFParticles, 1, MPI_INT, MPI_SUM, 0, Communicator);
+      
+      // Convert to physical units (Msun/yr)
+      double sfr_in_msun_per_year = totalSFR * All.UnitMass_in_g / SOLAR_MASS * All.UnitTime_in_s / SEC_PER_YEAR / All.HubbleParam;
+      double sfr_density = sfr_in_msun_per_year / volume;
+      double gas_mass_in_msun = totalGasMass * All.UnitMass_in_g / SOLAR_MASS / All.HubbleParam;
+      
+      // Write to SFR file
+      fprintf(FdSfr, "%g %g %g %g %g %d\n",
+              All.Time,                // Scale factor
+              z,                       // Redshift
+              sfr_in_msun_per_year,    // SFR in Msun/yr
+              sfr_density,             // SFR density in Msun/yr/Mpc^3
+              gas_mass_in_msun,        // Gas mass in Msun
+              nSFParticles);           // Number of star-forming gas cells
+      
+      fflush(FdSfr);
+    }
+}
 
 #endif /* STARFORMATION */
 #endif /* COOLING */
