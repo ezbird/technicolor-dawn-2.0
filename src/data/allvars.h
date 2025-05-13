@@ -356,8 +356,11 @@ struct global_data_all_processes : public parameters
 #endif
 
 #ifdef DUST
-  double saucer1;  
-  double saucer2;  
+  // Dust model parameters
+  double DustCondensationEfficiency;      // Global dust production efficiency
+  double DustGrowthTimescaleNorm;         // Base timescale for dust growth (yr)
+  double DustDestructionThresholdVelocity; // Velocity threshold for shock destruction
+  double DustThermalSputteringTemp;       // Temperature threshold for sputtering
 #endif
 
 #ifdef REDUCE_FLUSH
@@ -396,14 +399,6 @@ struct global_data_all_processes : public parameters
 
   inline size_t get_data_size(void) { return sizeof(global_data_all_processes) - sizeof(parameters); }
 };
-
-#ifdef DUST
-  // Dust model parameters
-  double DustCondensationEfficiency;      // Global dust production efficiency
-  double DustGrowthTimescaleNorm;         // Base timescale for dust growth (yr)
-  double DustDestructionThresholdVelocity; // Velocity threshold for shock destruction
-  double DustThermalSputteringTemp;       // Temperature threshold for sputtering
-#endif
 
 extern global_data_all_processes All;
 

@@ -210,10 +210,10 @@ void global_data_all_processes::register_parameters(void)
 #endif
 
 #ifdef DUST
-    add_param("DustCondensationEfficiency", PARAM_REAL, &All.DustCondensationEfficiency);
-    add_param("DustGrowthTimescaleNorm", PARAM_REAL, &All.DustGrowthTimescaleNorm);
-    add_param("DustDestructionThresholdVelocity", PARAM_REAL, &All.DustDestructionThresholdVelocity);
-    add_param("DustThermalSputteringTemp", PARAM_REAL, &All.DustThermalSputteringTemp);
+    add_param("DustCondensationEfficiency", &All.DustCondensationEfficiency, PARAM_DOUBLE, PARAM_FIXED);
+    add_param("DustGrowthTimescaleNorm", &All.DustGrowthTimescaleNorm, PARAM_DOUBLE, PARAM_FIXED);
+    add_param("DustDestructionThresholdVelocity", &All.DustDestructionThresholdVelocity, PARAM_DOUBLE, PARAM_FIXED);
+    add_param("DustThermalSputteringTemp", &All.DustThermalSputteringTemp, PARAM_DOUBLE, PARAM_FIXED);
 #endif
 
 #ifdef NGENIC
