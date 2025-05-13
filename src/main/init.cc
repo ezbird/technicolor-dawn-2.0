@@ -172,7 +172,10 @@ void sim::init(int RestartSnapNum)
 
       Domain.domain_resize_storage(count + Sp.NumPart, count, 0);
 
-      memmove(Sp.P + count, Sp.P, sizeof(particle_data) * Sp.NumPart);
+      for (int i = Sp.NumPart - 1; i >= 0; i--)
+        {
+          Sp.P[count + i] = Sp.P[i];
+        }
 
       Sp.NumPart += count;
       Sp.NumGas += count;
@@ -268,7 +271,7 @@ void sim::init(int RestartSnapNum)
 
 #ifdef DUST
     mpi_printf("DUST: Initializing on-the-fly dust model\n");
-    initialize_dust(Sp);
+    initialize_dust(&Sp);
 #endif
 
   double u_init = (1.0 / GAMMA_MINUS1) * (BOLTZMANN / PROTONMASS) * All.InitGasTemp;
