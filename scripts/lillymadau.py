@@ -60,7 +60,7 @@ def main():
                  alpha=0.7, label='Observations (M&D 2014)')
     
     # Set up log scales
-    plt.xscale('log')
+    #plt.xscale('log')
     plt.yscale('log')
     
     # Set axis limits
