@@ -870,7 +870,7 @@ void coolsfr::rearrange_particle_sequence(simparticles *Sp)
  * Write current star formation rate to sfr.txt
  * This should be called periodically during the simulation.
  */
-void coolsfr::log_sfr(void)
+void coolsfr::log_sfr(simparticles *Sp)  // Parameter now matches the declaration
 {
   // We need to use the Sp pointer from the cooling_and_starformation function
   // Let's make this function accept Sp as a parameter
