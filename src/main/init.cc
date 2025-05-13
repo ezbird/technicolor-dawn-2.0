@@ -22,7 +22,7 @@
 #include <cstring>
 
 #include "../cooling_sfr/cooling.h"
-#include "../cooling_sfr/dust.h"
+#include "../dust/dust.h"
 #include "../data/allvars.h"
 #include "../data/dtypes.h"
 #include "../data/mymalloc.h"
