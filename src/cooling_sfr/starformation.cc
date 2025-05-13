@@ -528,21 +528,21 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
       mpi_printf("STARFORMATION: %d particles eligible for star formation\n", sf_eligible);
 
     // Output total star formation rate
-  double glob_totsfr;
-  MPI_Allreduce(&total_sfr, &glob_totsfr, 1, MPI_DOUBLE, MPI_SUM, Communicator);
-  
-  // Add this new code to periodically log SFR to file
-  static double last_sfr_log_time = 0.0;
-  double sfr_log_interval = 0.01;  // Log every 0.01 in scale factor, adjust as needed
-  
-  if(All.Time - last_sfr_log_time >= sfr_log_interval)
-    {
-      // Call the SFR logging function
-      this->log_sfr();  // Use this->log_sfr() to avoid scope issues
-      
-      // Update the last log time
-      last_sfr_log_time = All.Time;
-    }
+    double glob_totsfr;
+    MPI_Allreduce(&total_sfr, &glob_totsfr, 1, MPI_DOUBLE, MPI_SUM, Communicator);
+    
+    // Add this new code to periodically log SFR to file "sfr.txt"
+    static double last_sfr_log_time = 0.0;
+    double sfr_log_interval = 0.01;  // Log every 0.01 in scale factor, adjust as needed
+    
+    if(All.Time - last_sfr_log_time >= sfr_log_interval)
+      {
+        // Call the SFR logging function
+        this->log_sfr();  // Use this->log_sfr() to avoid scope issues
+        
+        // Update the last log time
+        last_sfr_log_time = All.Time;
+      }
 
   TIMER_STOP(CPU_COOLING_SFR);
 }
