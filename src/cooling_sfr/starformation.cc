@@ -391,7 +391,7 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
    double totsfrrate; // Total star formation rate across the simulation
    double w = 0; // Random number for metallicity update
    double cum_mass_stars = 0; // Cumulative mass of stars formed
-   
+
   double time_h_a = (All.ComovingIntegrationOn) ? All.Time * All.cf_hubble_a : 1.0;
   double total_sfr = 0;  // Total star formation rate
   int sf_eligible = 0;
@@ -533,6 +533,8 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
   if(ThisTask == 0)
       mpi_printf("STARFORMATION: %d particles eligible for star formation\n", sf_eligible);
 
+
+  // Calculate total SFR stats and save to sfr.txt
   double sfrrate = 0;
    for(int bin = 0; bin < TIMEBINS; bin++)
      if(Sp->TimeBinsHydro.TimeBinCount[bin])
