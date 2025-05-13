@@ -527,29 +527,32 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
   if(ThisTask == 0)
       mpi_printf("STARFORMATION: %d particles eligible for star formation\n", sf_eligible);
 
-      // Output total star formation rate
-  double glob_totsfr;
-  MPI_Allreduce(&total_sfr, &glob_totsfr, 1, MPI_DOUBLE, MPI_SUM, Communicator);
-  
-  if(ThisTask == 0)
-      mpi_printf("STARFORMATION: %d particles eligible for star formation\n", sf_eligible);
-
-  // Add periodic SFR logging - this is the key change
-  static double last_sfr_log_time = All.TimeBegin; // Initialize to simulation start time
-  double sfr_log_interval = 0.01;  // Log every 0.01 in scale factor
-  
-  if(All.Time - last_sfr_log_time >= sfr_log_interval)
-    {
-      // Debug output
-      if(ThisTask == 0)
-          printf("STARFORMATION: Logging SFR data to sfr.txt at time=%g\n", All.Time);
-      
-      // Call the SFR logging function - use Logs.FdSfr
-      log_sfr(Sp);
-      
-      // Update the last log time
-      last_sfr_log_time = All.Time;
-    }
+  double sfrrate = 0;
+   for(int bin = 0; bin < TIMEBINS; bin++)
+     if(Sp->TimeBinsHydro.TimeBinCount[bin])
+       sfrrate += Sp->TimeBinSfr[bin];
+ 
+   MPI_Allreduce(&sfrrate, &totsfrrate, 1, MPI_DOUBLE, MPI_SUM, Communicator);
+ 
+   MPI_Reduce(&sum_sm, &total_sm, 1, MPI_DOUBLE, MPI_SUM, 0, Communicator);
+   MPI_Reduce(&sum_mass_stars, &total_sum_mass_stars, 1, MPI_DOUBLE, MPI_SUM, 0, Communicator);
+   if(ThisTask == 0)
+     {
+       if(All.TimeStep > 0)
+         rate = total_sm / (All.TimeStep / All.cf_atime_hubble_a);
+       else
+         rate = 0;
+ 
+       /* Compute the cumulative mass of stars formed */
+       cum_mass_stars += total_sum_mass_stars;
+ 
+       /* Convert the total mass converted into stars to a rate in solar masses per year */
+       rate_in_msunperyear = rate * (All.UnitMass_in_g / SOLAR_MASS) / (All.UnitTime_in_s / SEC_PER_YEAR);
+ 
+       /* Log the star formation rate and other statistics */
+       fprintf(Logs.FdSfr, "%14e %14e %14e %14e %14e %14e\n", All.Time, total_sm, totsfrrate, rate_in_msunperyear, total_sum_mass_stars, cum_mass_stars);
+       myflush(Logs.FdSfr);
+     }
 
   TIMER_STOP(CPU_COOLING_SFR);
 }
