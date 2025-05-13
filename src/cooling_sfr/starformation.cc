@@ -865,17 +865,12 @@ void coolsfr::rearrange_particle_sequence(simparticles *Sp)
     printf("COOLSFR: Rearranged %d particles after star formation.\n", swap_count);
 }
 
-
 /**
  * Write current star formation rate to sfr.txt
  * This should be called periodically during the simulation.
  */
 void coolsfr::log_sfr(simparticles *Sp)  // Parameter now matches the declaration
 {
-  // We need to use the Sp pointer from the cooling_and_starformation function
-  // Let's make this function accept Sp as a parameter
-  simparticles *particles = this->Sp;  // Use the class member Sp
-  
   if(ThisTask == 0 && FdSfr)
     {
       double z = 1.0 / All.Time - 1.0;
@@ -893,12 +888,12 @@ void coolsfr::log_sfr(simparticles *Sp)  // Parameter now matches the declaratio
       int local_sf_count = 0;
       
       // Sum up from all star-forming gas cells
-      for (int i = 0; i < particles->NumGas; i++)
+      for (int i = 0; i < Sp->NumGas; i++)
         {
-          if (particles->SphP[i].Sfr > 0)
+          if (Sp->SphP[i].Sfr > 0)
             {
-              local_sfr += particles->SphP[i].Sfr;
-              local_gas_mass += particles->P[i].getMass();
+              local_sfr += Sp->SphP[i].Sfr;
+              local_gas_mass += Sp->P[i].getMass();
               local_sf_count++;
             }
         }
