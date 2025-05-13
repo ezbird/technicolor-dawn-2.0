@@ -534,33 +534,7 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
       mpi_printf("STARFORMATION: %d particles eligible for star formation\n", sf_eligible);
 
 
-  // Calculate total SFR stats and save to sfr.txt
-  double sfrrate = 0;
-   for(int bin = 0; bin < TIMEBINS; bin++)
-     if(Sp->TimeBinsHydro.TimeBinCount[bin])
-       sfrrate += Sp->TimeBinSfr[bin];
- 
-   MPI_Allreduce(&sfrrate, &totsfrrate, 1, MPI_DOUBLE, MPI_SUM, Communicator);
- 
-   MPI_Reduce(&sum_sm, &total_sm, 1, MPI_DOUBLE, MPI_SUM, 0, Communicator);
-   MPI_Reduce(&sum_mass_stars, &total_sum_mass_stars, 1, MPI_DOUBLE, MPI_SUM, 0, Communicator);
-   if(ThisTask == 0)
-     {
-       if(All.TimeStep > 0)
-         rate = total_sm / (All.TimeStep / All.cf_atime_hubble_a);
-       else
-         rate = 0;
- 
-       /* Compute the cumulative mass of stars formed */
-       cum_mass_stars += total_sum_mass_stars;
- 
-       /* Convert the total mass converted into stars to a rate in solar masses per year */
-       rate_in_msunperyear = rate * (All.UnitMass_in_g / SOLAR_MASS) / (All.UnitTime_in_s / SEC_PER_YEAR);
- 
-       /* Log the star formation rate and other statistics */
-       fprintf(Logs.FdSfr, "%14e %14e %14e %14e %14e %14e\n", All.Time, total_sm, totsfrrate, rate_in_msunperyear, total_sum_mass_stars, cum_mass_stars);
-       myflush(Logs.FdSfr);
-     }
+  log_sfr(Sp);
 
   TIMER_STOP(CPU_COOLING_SFR);
 }
@@ -893,50 +867,80 @@ void coolsfr::rearrange_particle_sequence(simparticles *Sp)
  * Write star formation rate to sfr.txt
  * This is a simple version that matches what's working in starformation.cc
  */
+// Improved log_sfr function with proper column values
+
 void coolsfr::log_sfr(simparticles *Sp)
 {
-  // Doesn't need to check ThisTask because fprintf(Logs.FdSfr) is already task-safe
-  if (Logs.FdSfr)
+  // Only write from the root task
+  if(ThisTask == 0 && Logs.FdSfr)
   {
+    // Column 1: Time (scale factor)
+    double time = All.Time;
+    
+    // Column 2: Redshift
     double z = 1.0 / All.Time - 1.0;
     
-    // Calculate total SFR across all particles
-    double sfrrate = 0;
-    for(int bin = 0; bin < TIMEBINS; bin++)
-      if(Sp->TimeBinsHydro.TimeBinCount[bin])
-        sfrrate += Sp->TimeBinSfr[bin];
+    // Calculate SFR and related quantities
+    double total_sfr = 0.0;        // Total SFR in code units
+    double total_gas_mass = 0.0;   // Total gas mass
+    double total_sfr_mass = 0.0;   // Total mass in star-forming gas
+    int sfr_count = 0;             // Number of star-forming gas particles
     
-    // Get global SFR via reduction
-    double totsfrrate;
-    MPI_Allreduce(&sfrrate, &totsfrrate, 1, MPI_DOUBLE, MPI_SUM, Communicator);
-    
-    // Calculate SFR in solar masses per year
-    double rate_in_msunperyear = totsfrrate * (All.UnitMass_in_g / SOLAR_MASS) / (All.UnitTime_in_s / SEC_PER_YEAR);
-    
-    // Only the root task writes to the file
-    if(ThisTask == 0)
+    // Loop through all gas particles
+    for(int i = 0; i < Sp->NumGas; i++)
     {
-      // Simple format matching what's in the original code
-      fprintf(Logs.FdSfr, "%14e %14e %14e %14e %14e %14e\n", 
-              All.Time,          // Current time 
-              z,                 // Current redshift
-              totsfrrate,        // Total SFR in code units
-              rate_in_msunperyear, // SFR in Msun/yr
-              0.0,               // Placeholder for other quantities
-              0.0);              // Placeholder for other quantities
+      // Add to total gas mass
+      total_gas_mass += Sp->P[i].getMass();
       
-      // Make sure it's written to disk
-      fflush(Logs.FdSfr);
-      
-      // Debug output
-      printf("[SFR_LOG] Wrote to SFR file: time=%g z=%g SFR=%g Msun/yr\n", 
-              All.Time, z, rate_in_msunperyear);
+      // Check if this particle has SFR > 0
+      if(Sp->SphP[i].Sfr > 0)
+      {
+        total_sfr += Sp->SphP[i].Sfr;
+        total_sfr_mass += Sp->P[i].getMass();
+        sfr_count++;
+      }
     }
-  }
-  else if(ThisTask == 0)
-  {
-    // Debug warning if file handle is invalid
-    printf("[SFR_LOG] WARNING: Logs.FdSfr is NULL, cannot write SFR data\n");
+    
+    // Calculate derived quantities
+    double box_size_mpc = All.BoxSize / 1000.0;  // Convert kpc to Mpc
+    double volume = pow(box_size_mpc, 3.0);      // Volume in Mpc^3
+    
+    // Convert to physical units
+    // SFR from code units to Msun/yr
+    double sfr_in_msun_per_year = total_sfr * (All.UnitMass_in_g / SOLAR_MASS) / 
+                                  (All.UnitTime_in_s / SEC_PER_YEAR) / All.HubbleParam;
+    
+    // Calculate SFR density
+    double sfr_density = sfr_in_msun_per_year / volume;
+    
+    // Convert masses to Msun
+    double gas_mass_msun = total_gas_mass * (All.UnitMass_in_g / SOLAR_MASS) / All.HubbleParam;
+    double sfr_mass_msun = total_sfr_mass * (All.UnitMass_in_g / SOLAR_MASS) / All.HubbleParam;
+    
+    // For multi-process runs, collect data from all processes
+    double global_sfr, global_gas_mass;
+    int global_sfr_count;
+
+    MPI_Reduce(&total_sfr, &global_sfr, 1, MPI_DOUBLE, MPI_SUM, 0, Communicator);
+    MPI_Reduce(&total_gas_mass, &global_gas_mass, 1, MPI_DOUBLE, MPI_SUM, 0, Communicator);
+    MPI_Reduce(&sfr_count, &global_sfr_count, 1, MPI_INT, MPI_SUM, 0, Communicator);
+
+    // Then use global_sfr, global_gas_mass, global_sfr_count in your calculations
+
+    // Write to SFR file
+    fprintf(Logs.FdSfr, "%14e %14e %14e %14e %14e %d\n",
+            time,               // Column 1: Scale factor
+            z,                  // Column 2: Redshift
+            global_sfr,          // Column 3: SFR [Msun/yr]
+            sfr_density,        // Column 4: SFR density [Msun/yr/Mpc^3]
+            global_gas_mass,      // Column 5: Gas mass [Msun]
+            global_sfr_count);         // Column 6: Number of star-forming gas cells
+    
+    fflush(Logs.FdSfr);
+    
+    // Debug output
+    printf("[SFR_LOG] z=%g SF particles=%d SFR=%g Msun/yr SFRD=%g Msun/yr/Mpc^3\n", 
+           z, sfr_count, sfr_in_msun_per_year, sfr_density);
   }
 }
 
