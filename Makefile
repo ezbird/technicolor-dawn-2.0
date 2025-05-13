@@ -319,6 +319,13 @@ SUBDIRS += cooling_sfr
 endif
 
 
+ifeq (DUST,$(findstring DUST,$(CONFIGVARS)))
+OBJS    += dust/dust.o
+INCL    += dust/dust.h
+SUBDIRS += dust
+endif
+
+
 ifeq (FOF,$(findstring FOF,$(CONFIGVARS)))
 OBJS    += fof/fof.o fof/fof_findgroups.o fof/fof_nearest.o fof/fof_io.o fof/foftree_build.o
 INCL    += fof/fof.h  fof/fof_io.h  fof/foftree.h
