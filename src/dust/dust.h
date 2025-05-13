@@ -7,7 +7,7 @@
 #ifndef DUST_H
 #define DUST_H
 
-#include "../data/dtypes.h"
+#include "gadgetconfig.h"
 
 #ifdef DUST
 
