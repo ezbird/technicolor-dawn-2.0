@@ -149,10 +149,10 @@ CoolingDebugLevel        0     % Prints Cooling and UVB activity (0=none, 1=basi
 %DustVelocityScaling 1.0       # Velocity factor for dust
 
 %---- Dust Model Parameters ----
-DustCondensationEfficiency      0.3     % Default condensation efficiency
-DustGrowthTimescaleNorm         1.0e8   % Dust growth timescale in years
-DustDestructionThresholdVelocity 50.0   % km/s threshold for shock destruction
-DustThermalSputteringTemp        1.0e6  % K threshold for thermal sputtering
+%DustCondensationEfficiency      0.3     % Default condensation efficiency
+%DustGrowthTimescaleNorm         1.0e8   % Dust growth timescale in years
+%DustDestructionThresholdVelocity 50.0   % km/s threshold for shock destruction
+%DustThermalSputteringTemp        1.0e6  % K threshold for thermal sputtering
 
 %---- NGENIC Parameters (used ONLY when compiled with NGENIC)
 %NSample                     64             % Grid size - set same as NGENIC in Config.sh
