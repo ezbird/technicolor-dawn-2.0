@@ -48,7 +48,7 @@
   
    void close_star_formation_log(void);
    void integrate_sfr(void);
-   void log_sfr(void);
+   void log_sfr(simparticles *Sp);
    void rearrange_particle_sequence(simparticles *Sp);
 
    void init_starformation(void);
