@@ -94,8 +94,9 @@ MERGERTREE_H
 NGENIC_H
 CONVERT_H
 LGALAXIES_GALTREE_IO_H
+DUST_H
 
-#system defines
+#defines for the code
 _MSC_FULL_VER
 _MSC_VER
 __GNUC__
