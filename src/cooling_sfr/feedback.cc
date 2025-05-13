@@ -1052,6 +1052,12 @@ void ApplyFeedback(double stellar_mass, double metallicity, int snia_events) {
  *  file with columns: delta_u, delta_v, rel_inc, r, n_ngb, h_star, E_ratio, feedback_type.
  *  Neighbors have values in the first four columns; stars in the last four.
  */
+/** \brief Write out detailed feedback diagnostics to CSV for plotting
+ *
+ *  This routine dumps both per-neighbor and per-star metrics into a CSV
+ *  file with columns: delta_u, delta_v, rel_inc, r, n_ngb, h_star, E_ratio, feedback_type.
+ *  Neighbors have values in the first four columns; stars in the last four.
+ */
 void OutputFeedbackDiagnostics()
 {
     if (ThisTask != 0)
@@ -1090,7 +1096,7 @@ void OutputFeedbackDiagnostics()
         out << "# Feedback diagnostics at time=" << All.Time << "\n";
         out << "#delta_u,delta_v,rel_inc,r,n_ngb,h_star,E_ratio,feedback_type,time\n";
     } else {
-        // Add this missing else branch:
+        // Append to existing file
         out.open("feedback_diagnostics.csv", std::ios::app);
         
         if (!out.is_open()) {
@@ -1101,11 +1107,6 @@ void OutputFeedbackDiagnostics()
         out << std::scientific << std::setprecision(6);
     }
 
- // Update header
-        out << "# Feedback diagnostics at time=" << All.Time << "\n";
-        out << "#delta_u,delta_v,rel_inc,r,n_ngb,h_star,E_ratio,feedback_type,time\n";
-    }
-    
     // 1) Neighbor metrics with time
     for (size_t k = 0; k < g_delta_u.size(); ++k) {
         out << g_delta_u[k]      << ","
