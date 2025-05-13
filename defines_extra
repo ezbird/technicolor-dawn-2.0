@@ -152,7 +152,6 @@ NOWINDTIMECONSTRAINT
 SGREGSF
 STELLARAGE
 TABLECOOL
-
 METALFLOOR
 NONEQION
 RT
@@ -162,9 +161,7 @@ VCL_NAMESPACE
 MAX_VARIATION_TOLERANCE
 ALLOC_TOLERANCE
 
-#to be moved to Template COnfig, or removed from code
-
-
+#to be moved to Template Config, or removed from code
 NDEBUG
 FMM_DEBUG
 CHECK_LOCAL_RANK
