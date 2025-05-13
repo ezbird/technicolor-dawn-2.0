@@ -131,7 +131,8 @@
  
    void SetZeroIonization(void);
 
-   double DustCoolingRate(double logT, double rho, double dustToMetal, double dustToGas, gas_state *gs);
+   // Changed from gas_state* to const gas_state* to match implementation
+   double DustCoolingRate(double logT, double rho, double dustToMetal, double dustToGas, const gas_state *gs);
  #endif
  
  #ifdef STARFORMATION
