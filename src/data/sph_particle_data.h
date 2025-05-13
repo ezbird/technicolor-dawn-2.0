@@ -162,4 +162,21 @@ struct sph_particle_data : public sph_particle_data_hydrocore
 #endif
 };
 
+#ifdef DUST
+    // Dust mass components
+    double DustMass;        // Total dust mass
+    double SilicateMass;    // Silicate dust mass
+    double CarbonMass;      // Carbonaceous dust mass
+    double IronMass;        // Iron dust mass
+    
+    // Dust properties
+    double GrainSize;       // Mean dust grain size in μm
+    double DustTemp;        // Dust temperature
+    
+    // Dust diagnostics
+    double DustToMetalRatio;    // Dust-to-metal ratio
+    double DustFormationRate;   // Current dust formation rate
+    double DustDestructionRate; // Current dust destruction rate
+#endif
+
 #endif

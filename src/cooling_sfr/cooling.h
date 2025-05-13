@@ -97,9 +97,13 @@
  
    /* cooling data */
    struct do_cool_data
-   {
-     double u_old_input, rho_input, dt_input, ne_guess_input;
-   };
+    {
+      double u_old_input;
+      double rho_input;
+      double dt_input;
+      double ne_guess_input;
+      int index;  // Particle index for accessing dust properties
+    };
  
    gas_state GasState;      /**< gas state */
    do_cool_data DoCoolData; /**< cooling data */

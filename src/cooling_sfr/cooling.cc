@@ -412,6 +412,99 @@ double coolsfr::CoolingRateFromU(double u, double rho, double *ne_guess, gas_sta
   return CoolingRate(log10(temp), rho, ne_guess, gs, DoCool);
 }
 
+/**
+ * Add dust cooling contribution to the gas cooling rate
+ * This function should be called from CoolingRate() to incorporate dust effects
+ * 
+ * @param logT         log10 of gas temperature
+ * @param rho          gas density (cgs)
+ * @param dustToMetal  dust-to-metal ratio of the gas
+ * @param dustToGas    dust-to-gas ratio of the gas
+ * @return             additional cooling contribution in the same units as Lambda
+ */
+double coolsfr::DustCoolingRate(double logT, double rho, double dustToMetal, double dustToGas, const gas_state *gs)
+{
+    // If no dust, no dust cooling
+    if (dustToGas <= 0)
+        return 0.0;
+
+    double T = pow(10.0, logT);
+    double Lambda_dust = 0.0;
+
+    // Temperature regimes for dust cooling
+    if (T < 1.0e6)
+    {
+        // Dust thermal emission cooling (modified blackbody)
+        // Based on Dwek 1987 and Hirashita & Ferrara 2002
+        
+        // Approximate dust temperature scaling
+        // In realistic simulations, this would be solved self-consistently
+        double Tdust = 0.0;
+        if (T < 1.0e3)
+        {
+            // For cold gas, dust and gas temperatures are well-coupled
+            Tdust = T * 0.95;  // Slightly below gas temperature due to cooling
+        }
+        else if (T < 1.0e4)
+        {
+            // Transitional regime
+            Tdust = pow(T, 0.5) * 30.0;
+        }
+        else
+        {
+            // Hot gas - dust temp mainly set by radiation field
+            // For simplicity, we use a power-law approximation
+            Tdust = pow(T, 0.2) * 65.0;
+            
+            // Cap dust temperature in hot gas
+            if (Tdust > 150.0)
+                Tdust = 150.0;
+        }
+        
+        // Dust cooling rate per unit volume
+        // Using a modified Stefan-Boltzmann approximation
+        // Lambda_dust ~ dust_abundance * dust_emissivity * T_dust^6
+        // The T^6 scaling approximates the strong temperature dependence of dust emission
+        double dustEmissivity = 0.1;  // Typical dust emissivity
+        
+        Lambda_dust = 5.67e-5 * dustEmissivity * dustToGas * pow(Tdust, 6.0) / gs->nHcgs;
+        
+        // Scale by metallicity - dust cooling is more efficient at higher metallicity
+        // because dust and metals together enhance cooling
+        double metallicity = dustToGas / dustToMetal;
+        double Z_solar = 0.02;  // Solar metallicity
+        double Z_factor = pow(metallicity / Z_solar, 0.3);  // Sub-linear scaling
+        
+        Lambda_dust *= Z_factor;
+        
+        // Collisional cooling enhancement in dense regions
+        // Based on Goldsmith 2001 - dust collisional cooling increases with density
+        double nH_crit = 1.0e4;  // Critical density in cm^-3
+        if (gs->nHcgs > nH_crit)
+        {
+            double collisional_factor = 1.0 + 2.0 * log10(gs->nHcgs / nH_crit);
+            Lambda_dust *= collisional_factor;
+        }
+    }
+    else
+    {
+        // Dust sputtering in hot gas actually reduces cooling slightly
+        // Cooling rate reduction due to dust destruction
+        // This is a small effect, but included for completeness
+        double sputter_factor = 1.0 - 0.1 * dustToGas * pow(T / 1.0e6, 0.5);
+        
+        // Apply a small negative contribution (reduction of existing cooling)
+        // This is based on the reduced metal line cooling as dust depletes metals
+        Lambda_dust = -0.01 * dustToGas * pow(T, 0.5);
+    }
+    
+    // Ensure cooling rate is reasonable (limit extreme values)
+    Lambda_dust = fmax(Lambda_dust, -1.0e-22);  // Don't let it reduce cooling too much
+    Lambda_dust = fmin(Lambda_dust, 1.0e-21);   // Upper limit for reasonable dust cooling
+    
+    return Lambda_dust;
+}
+
 /** \brief  This function computes the self-consistent temperature and abundance ratios.
  *
  *  Used only in the file io.c (maybe it is not necessary)
@@ -441,7 +534,7 @@ double coolsfr::AbundanceRatios(double u, double rho, double *ne_guess, double *
   return temp;
 }
 
-/** \brief  Calculate (heating rate-cooling rate)/n_h^2 in cgs units.
+/** \brief  Calculate (heating rate-cooling rate)/n_h^2 in cgs units, including dust contribution
  *
  *  \param logT     log10 of gas temperature
  *  \param rho      gas density
@@ -487,6 +580,40 @@ double coolsfr::CoolingRate(double logT, double rho, double *nelec, gas_state *g
           Lambda += LambdaCmptn;
         }
 
+#ifdef DUST
+      // Get dust abundance information if available
+      double dustToMetal = 0.0;
+      double dustToGas = 0.0;
+      
+      // Check if this is a gas cell with dust information
+      int index = DoCool ? DoCool->index : -1;
+      if(index >= 0 && index < Sp->NumGas)
+      {
+          // Get the dust-to-metal ratio by comparing dust mass to total metals
+          double gas_mass = Sp->P[index].getMass();
+          double metal_mass = Sp->SphP[index].Metals[0] * gas_mass;
+          
+          if(metal_mass > 0)
+          {
+              dustToMetal = Sp->SphP[index].DustMass / metal_mass;
+              dustToGas = Sp->SphP[index].DustMass / gas_mass;
+          }
+          
+          // Ensure values are physically reasonable
+          dustToMetal = fmax(0.0, fmin(dustToMetal, 1.0));  // Maximum 100% of metals in dust
+          dustToGas = fmax(0.0, fmin(dustToGas, 0.1));     // Maximum 10% of gas mass in dust
+          
+          // Add the dust cooling contribution
+          double LambdaDust = DustCoolingRate(logT, rho, dustToMetal, dustToGas, gs);
+          Lambda += LambdaDust;
+          
+          // Optional debugging: print substantial dust cooling
+          if(fabs(LambdaDust) > 0.1 * Lambda && All.CoolingDebugLevel > 1)
+              COOLING_PRINT("Dust contributes significantly to cooling: %g (%.1f%% of total) for particle %d\n", 
+                         LambdaDust, 100.0 * LambdaDust / Lambda, index);
+      }
+#endif
+
       Heat = 0;
       if(pc.J_UV != 0)
         Heat += (gs->nH0 * pc.epsH0 + gs->nHe0 * pc.epsHe0 + gs->nHep * pc.epsHep) / gs->nHcgs;
@@ -517,6 +644,34 @@ double coolsfr::CoolingRate(double logT, double rho, double *nelec, gas_state *g
         LambdaCmptn = 0;
 
       Lambda = LambdaFF + LambdaCmptn;
+      
+#ifdef DUST
+      // Even at very high temperatures, dust can affect cooling slightly
+      // Primarily through thermal sputtering reducing dust abundance
+      
+      // Get dust abundance information if available
+      double dustToMetal = 0.0;
+      double dustToGas = 0.0;
+      
+      // Check if this is a gas cell with dust information
+      int index = DoCool ? DoCool->index : -1;
+      if(index >= 0 && index < Sp->NumGas)
+      {
+          // Calculate dust-to-gas ratio
+          double gas_mass = Sp->P[index].getMass();
+          double metal_mass = Sp->SphP[index].Metals[0] * gas_mass;
+          
+          if(metal_mass > 0)
+          {
+              dustToMetal = Sp->SphP[index].DustMass / metal_mass;
+              dustToGas = Sp->SphP[index].DustMass / gas_mass;
+          }
+          
+          // Add the dust cooling contribution (very small at these temperatures)
+          double LambdaDust = DustCoolingRate(logT, rho, dustToMetal, dustToGas, gs);
+          Lambda += LambdaDust;
+      }
+#endif
     }
 
   return (Heat - Lambda);
@@ -919,10 +1074,23 @@ void coolsfr::MakeCoolingTable()
 
 
 /** \brief Apply the isochoric cooling to all the active gas particles.
- *
+
+ * Set the particle index to ensure dust properties can be accessed during cooling
  */
- void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, const do_cool_data *DoCool)
+void coolsfr::cool_sph_particle(simparticles *Sp, int i, gas_state *gs, const do_cool_data *DoCool)
 {
+   // Create a local copy of DoCool with the particle index
+   do_cool_data localDoCool;
+   if (DoCool) {
+       localDoCool = *DoCool;
+   } else {
+       localDoCool.u_old_input = 0;
+       localDoCool.rho_input = 0;
+       localDoCool.dt_input = 0;
+       localDoCool.ne_guess_input = 0;
+   }
+   localDoCool.index = i;  // Set the particle index
+
    double dens = Sp->SphP[i].Density;
  
    double dt = (Sp->P[i].getTimeBinHydro() ? (((integertime)1) << Sp->P[i].getTimeBinHydro()) : 0) * All.Timebase_interval;
@@ -973,14 +1141,14 @@ void coolsfr::MakeCoolingTable()
    double safe_utherm = std::max<double>(min_energy, utherm);
    
    // Limit cooling timestep for numerical stability - don't cool by more than 50% in one step
-   double cooling_time = GetCoolingTime(safe_utherm, dens * All.cf_a3inv, &ne, gs, DoCool);
+   double cooling_time = GetCoolingTime(safe_utherm, dens * All.cf_a3inv, &ne, gs, &localDoCool);
    if(cooling_time > 0 && dtime > 0.5 * cooling_time) {
        dtime = 0.5 * cooling_time;
        COOLING_PRINT("Limited cooling timestep for particle %d (t_cool=%g)\n", i, cooling_time);
    }
    
    // Apply cooling with all safety measures in place
-   double unew = DoCooling(safe_utherm, dens * All.cf_a3inv, dtime, &ne, gs, DoCool);
+   double unew = DoCooling(safe_utherm, dens * All.cf_a3inv, dtime, &ne, gs, &localDoCool);
  
    Sp->SphP[i].Ne = ne;
  

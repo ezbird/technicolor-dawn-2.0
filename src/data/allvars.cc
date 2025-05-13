@@ -177,8 +177,6 @@ void global_data_all_processes::register_parameters(void)
   add_param("TreecoolFile", TreecoolFile, PARAM_STRING, PARAM_CHANGEABLE);
 #endif
 
-
-
 #ifdef STARFORMATION
   add_param("CritOverDensity", &CritOverDensity, PARAM_DOUBLE, PARAM_FIXED);
   add_param("CritPhysDensity", &CritPhysDensity, PARAM_DOUBLE, PARAM_FIXED);
@@ -209,6 +207,13 @@ void global_data_all_processes::register_parameters(void)
   add_param("FeedbackSNII", &FeedbackSNII, PARAM_INT, PARAM_FIXED);
   add_param("FeedbackSNIa", &FeedbackSNIa, PARAM_INT, PARAM_FIXED);
   add_param("FeedbackAGB", &FeedbackAGB, PARAM_INT, PARAM_FIXED);
+#endif
+
+#ifdef DUST
+    add_param("DustCondensationEfficiency", PARAM_REAL, &All.DustCondensationEfficiency);
+    add_param("DustGrowthTimescaleNorm", PARAM_REAL, &All.DustGrowthTimescaleNorm);
+    add_param("DustDestructionThresholdVelocity", PARAM_REAL, &All.DustDestructionThresholdVelocity);
+    add_param("DustThermalSputteringTemp", PARAM_REAL, &All.DustThermalSputteringTemp);
 #endif
 
 #ifdef NGENIC

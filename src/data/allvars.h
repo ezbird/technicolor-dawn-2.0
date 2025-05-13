@@ -343,7 +343,6 @@ struct global_data_all_processes : public parameters
   int LimitVelocitiesOnlyForGas;
   double MaxAllowedVelocity;
 
-  //int StarformationMode;
   double MetalYield;
 
   int FeedbackDebugLevel;         /* Print detailed diagnostics (0=no, 1=yes) */
@@ -397,6 +396,14 @@ struct global_data_all_processes : public parameters
 
   inline size_t get_data_size(void) { return sizeof(global_data_all_processes) - sizeof(parameters); }
 };
+
+#ifdef DUST
+  // Dust model parameters
+  double DustCondensationEfficiency;      // Global dust production efficiency
+  double DustGrowthTimescaleNorm;         // Base timescale for dust growth (yr)
+  double DustDestructionThresholdVelocity; // Velocity threshold for shock destruction
+  double DustThermalSputteringTemp;       // Temperature threshold for sputtering
+#endif
 
 extern global_data_all_processes All;
 

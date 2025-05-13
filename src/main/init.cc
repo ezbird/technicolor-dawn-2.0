@@ -265,6 +265,11 @@ void sim::init(int RestartSnapNum)
     }
 #endif
 
+#ifdef DUST
+    mpi_printf("DUST: Initializing on-the-fly dust model\n");
+    initialize_dust(Sp);
+#endif
+
   double u_init = (1.0 / GAMMA_MINUS1) * (BOLTZMANN / PROTONMASS) * All.InitGasTemp;
   u_init *= All.UnitMass_in_g / All.UnitEnergy_in_cgs; /* unit conversion */
 

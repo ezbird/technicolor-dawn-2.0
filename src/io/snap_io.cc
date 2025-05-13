@@ -129,20 +129,43 @@ void snap_io::init_basic(simparticles *Sp_ptr)
 #endif
 
 
-
-/* Need to look at this and update io_func_sfr and io_func_metallicity 
-   And what is All.RestartFlag == RST_FOF ? READ_IF_PRESENT : SKIP_ON_READ !!??  */
 #ifdef DUST
+  // Fields for separate dust particles (PartType6)
+  init_field("SIZE ", "GrainSize", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, READ_IF_PRESENT, 
+             1, A_P, &Sp->P[0].GrainSize, NULL, DUST_ONLY, 
+             1, 0., 0., 0., 0., 0., 1.0);  // Size in μm
 
-  init_field("SIZE ", "GrainSize", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, All.RestartFlag == RST_FOF ? READ_IF_PRESENT : SKIP_ON_READ,
-             1, A_NONE, 0, io_func_sfr, DUST_ONLY, 1, 0., 0., -1., 1., 1., SOLAR_MASS / SEC_PER_YEAR);
-
-  init_field("AGE ", "DustAge", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, READ_IF_PRESENT, 1, A_P, &Sp->P[0].DustAge, NULL,
-            DUST_ONLY, /* dust age */
+  init_field("AGE ", "DustAge", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, READ_IF_PRESENT, 
+             1, A_P, &Sp->P[0].DustAge, NULL, DUST_ONLY, 
              0, 0, 0, 0, 0, 0, 0);
 
-  init_field("DRAG   ", "DragCoeff", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, READ_IF_PRESENT, 1, A_NONE, 0, io_func_metallicity,
-            DUST_ONLY, /* gas and star metallicity */
+  init_field("DRAG", "DragCoeff", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, READ_IF_PRESENT, 
+             1, A_P, &Sp->P[0].DragCoeff, NULL, DUST_ONLY, 
+             0, 0, 0, 0, 0, 0, 0);
+
+  // New fields for on-the-fly dust in gas particles
+  init_field("DSTM", "DustMass", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, READ_IF_PRESENT, 
+             1, A_SPHP, &Sp->SphP[0].DustMass, NULL, GAS_ONLY, 
+             1, 0., 0., 0., 1., 0., All.UnitMass_in_g);
+
+  init_field("DSSI", "SilicateMass", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, READ_IF_PRESENT, 
+             1, A_SPHP, &Sp->SphP[0].SilicateMass, NULL, GAS_ONLY, 
+             1, 0., 0., 0., 1., 0., All.UnitMass_in_g);
+
+  init_field("DSCA", "CarbonMass", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, READ_IF_PRESENT, 
+             1, A_SPHP, &Sp->SphP[0].CarbonMass, NULL, GAS_ONLY, 
+             1, 0., 0., 0., 1., 0., All.UnitMass_in_g);
+
+  init_field("DSIR", "IronMass", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, READ_IF_PRESENT, 
+             1, A_SPHP, &Sp->SphP[0].IronMass, NULL, GAS_ONLY, 
+             1, 0., 0., 0., 1., 0., All.UnitMass_in_g);
+
+  init_field("DGRS", "GrainSize", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, READ_IF_PRESENT, 
+             1, A_SPHP, &Sp->SphP[0].GrainSize, NULL, GAS_ONLY, 
+             1, 0., 0., 0., 0., 0., 1.0);  // Size in μm
+  
+  init_field("DDTM", "DustToMetalRatio", MEM_MY_FLOAT, FILE_MY_IO_FLOAT, READ_IF_PRESENT, 
+             1, A_SPHP, &Sp->SphP[0].DustToMetalRatio, NULL, GAS_ONLY, 
              0, 0, 0, 0, 0, 0, 0);
 #endif
 

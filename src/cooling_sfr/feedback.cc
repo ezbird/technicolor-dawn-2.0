@@ -651,6 +651,16 @@ void ApplyFeedback(double stellar_mass, double metallicity, int snia_events) {
         // Also update the scalar Metallicity to match Metals[0]
         Sp->P[j].Metallicity = Sp->SphP[j].Metals[0];
 
+    #ifdef DUST
+        // Process dust production from these metals
+        if (ThisTask == 0) {
+            process_dust_production(Sp, j, FeedbackType, metals_add, Sp->SphP[j].Metals[0]);
+            
+            // Process dust destruction from shock
+            process_dust_destruction(Sp, j, v_kick);
+        }
+    #endif
+
         // Final check for numerical stability
         double final_u = Sp->get_utherm_from_entropy(j);
         if (!isfinite(final_u) || final_u < 1e-20 || final_u > 1e10) {
@@ -658,7 +668,7 @@ void ApplyFeedback(double stellar_mass, double metallicity, int snia_events) {
         }
 
         // Record neighbor-specific diagnostic information with feedback type
-        if (ThisTask == 0) {
+        if (ThisTask == 0 && All.FeedbackDebugLevel) {
             g_delta_u.push_back(delta_u);
             g_delta_v.push_back(v_kick);
             g_rel_increase.push_back(rel_increase);
@@ -669,7 +679,7 @@ void ApplyFeedback(double stellar_mass, double metallicity, int snia_events) {
     }
     
     // Record star-specific diagnostic information with feedback type
-    if (ThisTask == 0) {
+    if (ThisTask == 0 && All.FeedbackDebugLevel) {
         g_neighbors_per_star.push_back(TargetCount);
         g_h_per_star.push_back(SearchRadius);
         g_energy_ratio.push_back(sum_applied / E_input);
@@ -1076,6 +1086,21 @@ void OutputFeedbackDiagnostics()
         }
         out << std::scientific << std::setprecision(6);
 
+        // Write header once
+        out << "# Feedback diagnostics at time=" << All.Time << "\n";
+        out << "#delta_u,delta_v,rel_inc,r,n_ngb,h_star,E_ratio,feedback_type,time\n";
+    } else {
+        // Add this missing else branch:
+        out.open("feedback_diagnostics.csv", std::ios::app);
+        
+        if (!out.is_open()) {
+            std::fprintf(stderr,
+                "[Error] Could not open feedback_diagnostics.csv for appending\n");
+            return;
+        }
+        out << std::scientific << std::setprecision(6);
+    }
+
  // Update header
         out << "# Feedback diagnostics at time=" << All.Time << "\n";
         out << "#delta_u,delta_v,rel_inc,r,n_ngb,h_star,E_ratio,feedback_type,time\n";
@@ -1115,32 +1140,6 @@ void OutputFeedbackDiagnostics()
     g_star_feedback_type.clear();
     g_neighbor_time.clear();
     g_star_time.clear();
-}
-
-// Then update your recording functions:
-void RecordNeighborFeedback(double delta_u, double delta_v, double rel_increase, 
-                           double radial_distance, const char* feedback_type)
-{
-    if (ThisTask == 0) {
-        g_delta_u.push_back(delta_u);
-        g_delta_v.push_back(delta_v);
-        g_rel_increase.push_back(rel_increase);
-        g_radial_r.push_back(radial_distance);
-        g_neighbor_feedback_type.push_back(feedback_type);
-        g_neighbor_time.push_back(All.Time);  // Add current simulation time
-    }
-}
-
-void RecordStarFeedback(int n_neighbors, double h_kernel, double energy_ratio, 
-                        const char* feedback_type)
-{
-    if (ThisTask == 0) {
-        g_neighbors_per_star.push_back(n_neighbors);
-        g_h_per_star.push_back(h_kernel);
-        g_energy_ratio.push_back(energy_ratio);
-        g_star_feedback_type.push_back(feedback_type);
-        g_star_time.push_back(All.Time);  // Add current simulation time
-    }
 }
  
  #endif // FEEDBACK
