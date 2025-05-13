@@ -103,6 +103,9 @@
       double dt_input;
       double ne_guess_input;
       int index;  // Particle index for accessing dust properties
+
+      // Constructor to initialize members (prevents uninitialized memory issues)
+      do_cool_data() : u_old_input(0), rho_input(0), dt_input(0), ne_guess_input(0), index(-1) {}
     };
  
    gas_state GasState;      /**< gas state */
@@ -127,6 +130,8 @@
                          gas_state *gs, const do_cool_data *DoCool);
  
    void SetZeroIonization(void);
+
+   double DustCoolingRate(double logT, double rho, double dustToMetal, double dustToGas, gas_state *gs);
  #endif
  
  #ifdef STARFORMATION

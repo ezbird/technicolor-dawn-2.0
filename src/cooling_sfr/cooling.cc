@@ -192,8 +192,8 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
  *  \param ne_guess electron number density relative to hydrogen number density
  *  \return the gas temperature
  */
- double coolsfr::convert_u_to_temp(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
- {
+double coolsfr::convert_u_to_temp(double u, double rho, double *ne_guess, gas_state *gs, const do_cool_data *DoCool)
+{
      // --- Convert code‐units of u (erg/g in code) to physical cgs units ---
      //   u_code × (UnitEnergy_in_cgs / UnitMass_in_g) → u_cgs [erg/g]
      double u_cgs = u * (All.UnitEnergy_in_cgs / All.UnitMass_in_g);
@@ -224,7 +224,8 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
      
      double temp_old = temp;
      for(int iter = 0; iter < MAX_ITERS; ++iter) {
-         double ne_old = *ne_guess;
+         // Remove unused variable - just call find_abundances directly
+         // double ne_old = *ne_guess;  <- This was the unused variable
          
          // update electron fraction & rates at current T
          if (!gsl_finite(std::log10(temp))) {
@@ -260,7 +261,7 @@ double coolsfr::GetCoolingTime(double u_old, double rho, double *ne_guess, gas_s
      // if we get here, we failed to converge – warn and return last value
      COOLING_PRINT("convert_u_to_temp did not converge in %d iterations, T≈%g K", MAX_ITERS, temp);
      return temp;
- }
+}
 
 
 /** \brief Computes the actual abundance ratios.
