@@ -264,7 +264,7 @@ void sim::calculate_non_standard_physics_end_of_step(void)
 #endif
 
 #ifdef DUST
-    process_dust_physics(Sp, All.TimeStep);
+    process_dust_physics(&Sp, All.TimeStep);
 #endif
 
 #ifdef MEASURE_TOTAL_MOMENTUM
