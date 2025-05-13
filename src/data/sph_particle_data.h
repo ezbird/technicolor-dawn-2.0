@@ -160,7 +160,7 @@ struct sph_particle_data : public sph_particle_data_hydrocore
 #ifdef TIMEDEP_ART_VISC
   void set_viscosity_coefficient(double dt);
 #endif
-};
+
 
 #ifdef DUST
     // Dust mass components
@@ -178,5 +178,7 @@ struct sph_particle_data : public sph_particle_data_hydrocore
     double DustFormationRate;   // Current dust formation rate
     double DustDestructionRate; // Current dust destruction rate
 #endif
+
+};
 
 #endif
