@@ -21,6 +21,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "../dust/dust.h"
 #include "../cooling_sfr/cooling.h"
 #include "../cooling_sfr/feedback.h"
 #include "../data/allvars.h"
