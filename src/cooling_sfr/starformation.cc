@@ -386,6 +386,11 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
   
   All.set_cosmo_factors_for_current_time();
   
+   double sum_sm, total_sm, rate, sum_mass_stars, total_sum_mass_stars; // Variables for accumulating star mass
+   double rate_in_msunperyear; // Star formation rate in solar masses per year
+   double totsfrrate; // Total star formation rate across the simulation
+   double w = 0; // Random number for metallicity update
+
   double time_h_a = (All.ComovingIntegrationOn) ? All.Time * All.cf_hubble_a : 1.0;
   double total_sfr = 0;  // Total star formation rate
   int sf_eligible = 0;
