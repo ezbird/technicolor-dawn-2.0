@@ -122,7 +122,7 @@ WindFreeTravelDensFac 0.1
 %StarformationMode     1
 MetalYield            0.02
 MaxSfrTimescale       2.7        % usually 1.5; Gas consumption timescale (multi-phase model)
-MaxStarFormationTemp  15000      % only form stars where T < 15000 K
+MaxStarFormationTemp  10000      % only form stars where T < 10000 K
 FactorSN              0.193      % beta, mass fraction of massive stars (multi-phase model)
 FactorEVP             1000       % A_0, evaporation parameter (multi-phase model); smaller value means lower pressure support, making it easier for gas to collapse
 TempSupernova         1e8        % T_SN, effective "supernova temperature",sets feedback energy (multi-phase model)
