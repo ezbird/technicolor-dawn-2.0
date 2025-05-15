@@ -2,7 +2,7 @@
 % NOTE: new parameters must be updated in allvars.cc and allvars.h
 
 %----  Relevant files 
-InitCondFile         ICs/ngenic_64_1000kpc
+InitCondFile         ICs/ngenic_32_1000kpc
 TreecoolFile         data/TREECOOL_fg_dec11
 OutputDir            ./output
 SnapshotFileBase     snapshot

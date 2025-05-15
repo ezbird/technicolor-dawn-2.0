@@ -264,10 +264,8 @@ void coolsfr::init_clouds(void)
 }
 
 /**
- * Calculate the star formation rate of a gas particle
- */
-/**
  * Calculate the star formation rate of a gas particle with Gadget-3 style approach
+ * Now includes additional temperature check to prevent hot gas from forming stars
  */
 double coolsfr::get_starformation_rate(int i, double *xcloud, simparticles *Sp)
 {
@@ -282,6 +280,22 @@ double coolsfr::get_starformation_rate(int i, double *xcloud, simparticles *Sp)
 
   if(Sp->SphP[i].SfFlag == 0)
     return 0;
+
+  // Perform additional temperature check to ensure the particle is still eligible
+  double utherm = Sp->get_utherm_from_entropy(i);
+  double rho = Sp->SphP[i].Density * All.cf_a3inv;
+  double currentTemp = convert_u_to_temp(utherm, rho, &Sp->SphP[i].Ne, &gs, &DoCool);
+  
+  // Skip star formation if temperature exceeds threshold
+  if(currentTemp > All.MaxStarFormationTemp) {
+    if(ThisTask == 0 && All.StarFormationDebugLevel > 1) {
+      printf("[SF_DEBUG] Particle %d too hot for SF: T=%g K > %g K\n", 
+             Sp->P[i].ID.get(), currentTemp, All.MaxStarFormationTemp);
+    }
+    // Reset the SF flag to prevent further attempts
+    Sp->SphP[i].SfFlag = 0;
+    return 0;
+  }
 
   // Using approach similar to Gadget-3's non-H2 model
   tsfr = sqrt(All.PhysDensThresh / (Sp->SphP[i].Density * All.cf_a3inv)) * All.MaxSfrTimescale;
@@ -316,9 +330,6 @@ double coolsfr::get_starformation_rate(int i, double *xcloud, simparticles *Sp)
   return rateOfSF;
 }
 
-/**
- * Create a star particle from a gas particle
- */
 /**
  * Create a star particle from a gas particle with additional debugging
  */
@@ -396,15 +407,9 @@ void coolsfr::create_star_particle(simparticles *Sp, int i, double prob, double 
 }
 
 /**
- * This function handles gas cooling and star formation
- */
-/**
- * Modified version of cooling_and_starformation to make it more similar to Gadget-3
- * This includes a more flexible star formation criteria with smoother transitions
- */
-/**
  * Improved cooling_and_starformation function that more closely replicates Gadget-3 behavior
  * This eliminates the artificial vertical density cutoff in phase diagrams
+ * Added additional temperature check to prevent hot gas from forming stars
  */
 void coolsfr::cooling_and_starformation(simparticles *Sp)
 {
@@ -428,8 +433,8 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
   if(ThisTask == 0 && All.StarFormationDebugLevel) {
     mpi_printf("STARFORMATION: Using G3-like params: CritPhysDensity=%g, MaxSfrTimescale=%g, FactorSN=%g, FactorEVP=%g\n", 
               All.CritPhysDensity, All.MaxSfrTimescale, All.FactorSN, All.FactorEVP);
-    mpi_printf("STARFORMATION: TempSupernova=%g, TempClouds=%g, CritOverDensity=%g\n",
-              All.TempSupernova, All.TempClouds, All.CritOverDensity);
+    mpi_printf("STARFORMATION: TempSupernova=%g, TempClouds=%g, CritOverDensity=%g, MaxStarFormationTemp=%g\n",
+              All.TempSupernova, All.TempClouds, All.CritOverDensity, All.MaxStarFormationTemp);
   }
   
   // Calculate current redshift
@@ -454,6 +459,16 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
           double utherm = Sp->get_utherm_from_entropy(target);
           double rho = Sp->SphP[target].Density * All.cf_a3inv;
           double currentTemp = convert_u_to_temp(utherm, rho, &Sp->SphP[target].Ne, &gs, &DoCool);
+          
+          // Strict temperature check to ensure only cold gas can form stars
+          if(currentTemp > All.MaxStarFormationTemp) {
+            // Skip particles that are too hot
+            if(ThisTask == 0 && All.StarFormationDebugLevel > 2) {
+              printf("[SF_DEBUG] Particle %d too hot: T=%g K > %g K\n", 
+                     Sp->P[target].ID.get(), currentTemp, All.MaxStarFormationTemp);
+            }
+            continue;
+          }
           
           // ---------- GADGET-3 STYLE CRITERIA WITH IMPROVEMENTS ----------
           
@@ -509,6 +524,9 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
             // Tuned coefficient (0.3) controls the slope of the diagonal boundary
             max_temp_threshold *= (1.0 + 0.3 * excess_density_factor);
           }
+          
+          // Store the calculated temperature threshold for later use
+          Sp->SphP[target].MaxAllowedTemp = max_temp_threshold;
           
           // Apply the combined criteria for SF eligibility
           if(currentTemp < max_temp_threshold && rho >= effective_threshold) {
@@ -570,6 +588,13 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
               double sfr = get_starformation_rate(target, &xcloud, Sp);
               Sp->SphP[target].Sfr = sfr;
               
+              // SfFlag might have been reset in get_starformation_rate due to temperature
+              if(Sp->SphP[target].SfFlag == 0) {
+                // Star formation has been aborted - do cooling instead
+                cool_sph_particle(Sp, target, &gs, &DoCool);
+                continue;
+              }
+              
               total_sfr += sfr;
 
               // Calculate star formation probability
@@ -621,15 +646,32 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
               // Random number for star formation decision
               double rnd = get_random_number(Sp->P[target].ID.get() + target + All.NumCurrentTiStep);
               
-              // Create star if probability check passes
-              create_star_particle(Sp, target, prob, rnd, convert_u_to_temp(Sp->get_utherm_from_entropy(target), 
-                                  Sp->SphP[target].Density * All.cf_a3inv, &Sp->SphP[target].Ne, &gs, &DoCool));
-              
+              // Perform final temperature check before creating star
+              double currentTemp = convert_u_to_temp(Sp->get_utherm_from_entropy(target), 
+                                  Sp->SphP[target].Density * All.cf_a3inv, &Sp->SphP[target].Ne, &gs, &DoCool);
+                                  
+              // Re-check temperature threshold before forming star
+              if(currentTemp > All.MaxStarFormationTemp) {
+                // Too hot to form stars - skip star formation
+                if(ThisTask == 0 && All.StarFormationDebugLevel) {
+                  printf("[SF_WARNING] Skipping too hot particle %d: T=%g K > %g K threshold\n", 
+                        Sp->P[target].ID.get(), currentTemp, All.MaxStarFormationTemp);
+                }
+                // Set star formation rate to 0
+                Sp->SphP[target].Sfr = 0;
+                // Do cooling instead
+                cool_sph_particle(Sp, target, &gs, &DoCool);
+              }
+              else {
+                // Create star if probability check passes
+                create_star_particle(Sp, target, prob, rnd, currentTemp);
+                
 #ifdef WINDS
-              // Handle wind model if particle hasn't been turned into a star
-              if(Sp->P[target].getType() == 0)
-                spawn_wind_particle(Sp, target, cloudmass, tsfr);
+                // Handle wind model if particle hasn't been turned into a star
+                if(Sp->P[target].getType() == 0)
+                  spawn_wind_particle(Sp, target, cloudmass, tsfr);
 #endif
+              }
             }
           else
             {
@@ -966,20 +1008,11 @@ void coolsfr::rearrange_particle_sequence(simparticles *Sp)
 }
 
 /**
- * Write current star formation rate to sfr.txt
- * This should be called periodically during the simulation.
- */
-// Add this function to cooling.cc (not starformation.cc)
-
-/**
  * Write star formation rate to sfr.txt
  * This is a simple version that matches what's working in starformation.cc
  */
-// Improved log_sfr function with proper column values
-
 void coolsfr::log_sfr(simparticles *Sp)
 {
-
     // Column 1: Time (scale factor)
     double time = All.Time;
     
@@ -1030,26 +1063,25 @@ void coolsfr::log_sfr(simparticles *Sp)
     MPI_Reduce(&total_sfr, &global_sfr, 1, MPI_DOUBLE, MPI_SUM, 0, Communicator);
     MPI_Reduce(&total_gas_mass, &global_gas_mass, 1, MPI_DOUBLE, MPI_SUM, 0, Communicator);
     MPI_Reduce(&sfr_count, &global_sfr_count, 1, MPI_INT, MPI_SUM, 0, Communicator);
-    // Then use global_sfr, global_gas_mass, global_sfr_count in your calculations
-
-      // Only write from the root task
-  if(ThisTask == 0 && Logs.FdSfr)
-  {
-    // Write to SFR file
-    fprintf(Logs.FdSfr, "%14e %14e %14e %14e %14e %d\n",
-            time,               // Column 1: Scale factor
-            z,                  // Column 2: Redshift
-            global_sfr,          // Column 3: SFR [Msun/yr]
-            sfr_density,        // Column 4: SFR density [Msun/yr/Mpc^3]
-            global_gas_mass,      // Column 5: Gas mass [Msun]
-            global_sfr_count);         // Column 6: Number of star-forming gas cells
     
-    fflush(Logs.FdSfr);
-    
-    // Debug output
-    printf("[SFR_LOG] z=%g SF particles=%d SFR=%g Msun/yr SFRD=%g Msun/yr/Mpc^3\n", 
-           z, sfr_count, sfr_in_msun_per_year, sfr_density);
-  }
+    // Only write from the root task
+    if(ThisTask == 0 && Logs.FdSfr)
+    {
+      // Write to SFR file
+      fprintf(Logs.FdSfr, "%14e %14e %14e %14e %14e %d\n",
+              time,               // Column 1: Scale factor
+              z,                  // Column 2: Redshift
+              global_sfr,          // Column 3: SFR [Msun/yr]
+              sfr_density,        // Column 4: SFR density [Msun/yr/Mpc^3]
+              global_gas_mass,      // Column 5: Gas mass [Msun]
+              global_sfr_count);         // Column 6: Number of star-forming gas cells
+      
+      fflush(Logs.FdSfr);
+      
+      // Debug output
+      printf("[SFR_LOG] z=%g SF particles=%d SFR=%g Msun/yr SFRD=%g Msun/yr/Mpc^3\n", 
+             z, sfr_count, sfr_in_msun_per_year, sfr_density);
+    }
 }
 
 #endif /* STARFORMATION */
