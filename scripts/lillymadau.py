@@ -81,8 +81,8 @@ def main():
     
     # Save and display
     plt.tight_layout()
-    plt.savefig(args.output, dpi=300)
-    print(f"Plot saved as {args.output}")
+    plt.savefig("lilly_madau.png", dpi=300)
+    print(f"Plot saved as lilly_madau.png")
     plt.show()
 
 if __name__ == "__main__":
