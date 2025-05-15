@@ -20,6 +20,9 @@ def main():
         print(f"Error: File {args.sfr_file} not found!")
         return
     
+    args.sfr_file = "../output/sfr.txt"
+    args.g3_file = "~/gadget-3.27output/sfr.txt"
+
     # Read SFR data - just the necessary columns
     try:
         data = np.loadtxt(args.sfr_file)
