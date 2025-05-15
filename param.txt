@@ -2,7 +2,7 @@
 % NOTE: new parameters must be updated in allvars.cc and allvars.h
 
 %----  Relevant files 
-InitCondFile         ICs/ngenic_32_1000kpc
+InitCondFile         ICs/ngenic_64_1000kpc
 TreecoolFile         data/TREECOOL_fg_dec11
 OutputDir            ./output
 SnapshotFileBase     snapshot
@@ -138,7 +138,7 @@ FeedbackSNIa          1     % Enable Type Ia supernova feedback (0=off, 1=on)
 FeedbackAGB           1     % Enable AGB stellar winds feedback (0=off, 1=on)
 
 %----- Debugging
-StarFormationDebugLevel  1     % Prints star formation-related activity (0=none, 1=basic, 2=verbose)   NEED TO DO 1-2
+StarFormationDebugLevel  2     % Prints star formation-related activity (0=none, 1=basic, 2=verbose)   NEED TO DO 1-2
 FeedbackDebugLevel       1     % Prints feedback-related activity (0=none, 1=basic, 2=verbose)    NEED TO DO 1-2
 CoolingDebugLevel        0     % Prints Cooling and UVB activity (0=none, 1=basic, 2=verbose)
 

@@ -402,6 +402,10 @@ void coolsfr::create_star_particle(simparticles *Sp, int i, double prob, double 
  * Modified version of cooling_and_starformation to make it more similar to Gadget-3
  * This includes a more flexible star formation criteria with smoother transitions
  */
+/**
+ * Improved cooling_and_starformation function that more closely replicates Gadget-3 behavior
+ * This eliminates the artificial vertical density cutoff in phase diagrams
+ */
 void coolsfr::cooling_and_starformation(simparticles *Sp)
 {
   TIMER_START(CPU_COOLING_SFR);
@@ -419,6 +423,17 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
 
   gas_state gs = GasState;
   do_cool_data DoCool = DoCoolData;
+  
+  // Debug output the G3-like parameter values we're using
+  if(ThisTask == 0 && All.StarFormationDebugLevel) {
+    mpi_printf("STARFORMATION: Using G3-like params: CritPhysDensity=%g, MaxSfrTimescale=%g, FactorSN=%g, FactorEVP=%g\n", 
+              All.CritPhysDensity, All.MaxSfrTimescale, All.FactorSN, All.FactorEVP);
+    mpi_printf("STARFORMATION: TempSupernova=%g, TempClouds=%g, CritOverDensity=%g\n",
+              All.TempSupernova, All.TempClouds, All.CritOverDensity);
+  }
+  
+  // Calculate current redshift
+  double redshift = 1.0/All.Time - 1.0;
   
   // ---------- FIRST LOOP: EVALUATE STAR FORMATION ELIGIBILITY ----------
   for(int i = 0; i < Sp->TimeBinsHydro.NActiveParticles; i++)
@@ -440,46 +455,77 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
           double rho = Sp->SphP[target].Density * All.cf_a3inv;
           double currentTemp = convert_u_to_temp(utherm, rho, &Sp->SphP[target].Ne, &gs, &DoCool);
           
-          // ---------- GADGET-3 STYLE CRITERIA ----------
-          // Temperature-dependent density threshold - creates a smoother transition
-          // Calculate a redshift-dependent density threshold
-          double redshift = 1.0/All.Time - 1.0;
+          // ---------- GADGET-3 STYLE CRITERIA WITH IMPROVEMENTS ----------
+          
+          // Base physical density threshold (same as G3)
+          double base_threshold = All.PhysDensThresh;
+          
+          // 1. Redshift-dependent modifier (stronger effect than before)
           double z_factor = 1.0;
-          
-          // Optionally scale threshold with redshift - smoothly decreases threshold at low-z
-          if(redshift < 2.0) {
-            z_factor = 1.0 - 0.3 * (2.0 - redshift) / 2.0; // Gradual decrease from z=2 to z=0
-            if(z_factor < 0.7) z_factor = 0.7; // Don't reduce too much
+          if(redshift < 3.0) {
+            // More aggressive reduction at low redshift - linearly decreases from z=3 to z=0
+            z_factor = 0.5 + 0.5 * (redshift / 3.0);
+            
+            // Ensure we don't go below 40% of the original threshold
+            if(z_factor < 0.4) z_factor = 0.4;
           }
           
-          // Calculate temperature-dependent threshold
-          double temp_factor = 1.0;
-          if(currentTemp > 0.5 * All.MaxStarFormationTemp) {
-            // Smoothly increase threshold as we approach temperature limit
-            temp_factor = 1.0 + 5.0 * (currentTemp - 0.5 * All.MaxStarFormationTemp) / 
-                         (0.5 * All.MaxStarFormationTemp);
+          // 2. Temperature-dependent modifier (creates slope in phase space)
+          double temp_ratio = currentTemp / All.MaxStarFormationTemp;
+          double temp_factor;
+          
+          if(temp_ratio <= 0.2) {
+            // For very cold gas, no modification
+            temp_factor = 1.0;
+          }
+          else if(temp_ratio >= 0.9) {
+            // Very warm gas - high threshold (effectively blocks star formation)
+            temp_factor = 10.0;
+          }
+          else {
+            // Smooth transition - quadratic increase with temperature
+            double normalized = (temp_ratio - 0.2) / 0.7;  // 0 to 1 as temp goes from 20% to 90%
+            temp_factor = 1.0 + 9.0 * normalized * normalized;  // Quadratic rise from 1 to 10
           }
           
-          // Compute effective threshold by combining these factors
-          double effective_threshold = All.PhysDensThresh * z_factor * temp_factor;
+          // 3. Add randomness to break the perfect boundary
+          // Mix particle properties into the randomness source
+          unsigned int seed = Sp->P[target].ID.get() + 
+                             (unsigned int)(1000.0 * Sp->SphP[target].Entropy) + 
+                             (unsigned int)(31415.0 * rho / All.PhysDensThresh);
+          double random_factor = 0.85 + 0.3 * get_random_number(seed);
           
-          // Standard density-threshold star formation with Gadget-3 style checks
-          if(currentTemp < All.MaxStarFormationTemp) {
-            if(rho >= effective_threshold) {
-              Sp->SphP[target].SfFlag = 1;
-              sf_eligible++;
-              
-              if(ThisTask == 0 && All.StarFormationDebugLevel > 1) {
-                printf("[SF_DEBUG] Particle %d eligible for SF: rho=%g, temp=%g, threshold=%g (z=%g)\n",
-                       Sp->P[target].ID.get(), rho, currentTemp, effective_threshold, redshift);
-              }
+          // 4. Combine all factors (with randomness) to get effective threshold
+          double effective_threshold = base_threshold * z_factor * temp_factor * random_factor;
+          
+          // 5. Create a density-dependent temperature threshold (crucial for diagonal boundary)
+          // As density increases above threshold, allowed temperature increases
+          double max_temp_threshold = All.MaxStarFormationTemp;
+          if(rho > base_threshold) {
+            // Log-slope in density space creates diagonal line in log-log phase space
+            double excess_density_factor = log10(rho / base_threshold);
+            
+            // Scale allowed temperature with density excess
+            // Tuned coefficient (0.3) controls the slope of the diagonal boundary
+            max_temp_threshold *= (1.0 + 0.3 * excess_density_factor);
+          }
+          
+          // Apply the combined criteria for SF eligibility
+          if(currentTemp < max_temp_threshold && rho >= effective_threshold) {
+            Sp->SphP[target].SfFlag = 1;
+            sf_eligible++;
+            
+            // Debug output if enabled
+            if(ThisTask == 0 && All.StarFormationDebugLevel > 1) {
+              printf("[SF_DEBUG] Particle %d eligible: rho=%g, T=%g, rho_thresh=%g, T_max=%g (z=%g z_f=%g, t_f=%g, r_f=%g)\n",
+                    Sp->P[target].ID.get(), rho, currentTemp, effective_threshold, max_temp_threshold,
+                    redshift, z_factor, temp_factor, random_factor);
             }
           }
-            
-          // Additional cosmological threshold check
-          if(All.ComovingIntegrationOn)
-            if(Sp->SphP[target].Density < All.OverDensThresh)
-              Sp->SphP[target].SfFlag = 0;
+          
+          // Additional cosmological threshold check (same as original G3)
+          if(All.ComovingIntegrationOn && Sp->SphP[target].Density < All.OverDensThresh)
+            Sp->SphP[target].SfFlag = 0;
 
 #ifdef WINDS
           // Handle wind particles
