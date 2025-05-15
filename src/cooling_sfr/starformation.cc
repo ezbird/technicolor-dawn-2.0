@@ -526,7 +526,7 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
           }
           
           // Store the calculated temperature threshold for later use
-          Sp->SphP[target].MaxAllowedTemp = max_temp_threshold;
+          //Sp->SphP[target].MaxAllowedTemp = max_temp_threshold;
           
           // Apply the combined criteria for SF eligibility
           if(currentTemp < max_temp_threshold && rho >= effective_threshold) {
