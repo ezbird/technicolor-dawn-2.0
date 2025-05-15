@@ -266,6 +266,9 @@ void coolsfr::init_clouds(void)
 /**
  * Calculate the star formation rate of a gas particle
  */
+/**
+ * Calculate the star formation rate of a gas particle with Gadget-3 style approach
+ */
 double coolsfr::get_starformation_rate(int i, double *xcloud, simparticles *Sp)
 {
   double rateOfSF;
@@ -280,7 +283,7 @@ double coolsfr::get_starformation_rate(int i, double *xcloud, simparticles *Sp)
   if(Sp->SphP[i].SfFlag == 0)
     return 0;
 
-#if !defined(H2REGSF) && !defined(SGREGSF) && !defined(H2AUTOSHIELD)
+  // Using approach similar to Gadget-3's non-H2 model
   tsfr = sqrt(All.PhysDensThresh / (Sp->SphP[i].Density * All.cf_a3inv)) * All.MaxSfrTimescale;
 
   factorEVP = pow(Sp->SphP[i].Density * All.cf_a3inv / All.PhysDensThresh, -0.8) * All.FactorEVP;
@@ -288,20 +291,24 @@ double coolsfr::get_starformation_rate(int i, double *xcloud, simparticles *Sp)
   egyhot = All.EgySpecSN / (1 + factorEVP) + All.EgySpecCold;
 
   ne = Sp->SphP[i].Ne;
-#ifdef TABLECOOL
   tcool = GetCoolingTime(egyhot, Sp->SphP[i].Density * All.cf_a3inv, &ne, &gs, &DoCool);
-#else
-  tcool = GetCoolingTime(egyhot, Sp->SphP[i].Density * All.cf_a3inv, &ne, &gs, &DoCool);
-#endif
 
+  // Gadget-3 style calculation of cold cloud fraction
   y = tsfr / tcool * egyhot / (All.FactorSN * All.EgySpecSN - (1 - All.FactorSN) * All.EgySpecCold);
-  x = 1 + 1 / (2 * y) - sqrt(1 / y + 1 / (4 * y * y));
+  
+  // Careful handling to avoid numerical issues
+  if(y <= 0) {
+    x = 0;  // No cold clouds
+  } else {
+    x = 1 + 1 / (2 * y) - sqrt(1 / y + 1 / (4 * y * y));
+    if(x < 0) x = 0;  // Numerical safety
+    if(x > 1) x = 1;  // Cap at 100%
+  }
 
   cloudmass = x * Sp->P[i].getMass();
   *xcloud = x;
-#endif
   
-  rateOfSF = cloudmass / tsfr;
+  rateOfSF = (1 - All.FactorSN) * cloudmass / tsfr;
 
   /* convert to solar masses per yr */
   rateOfSF *= (All.UnitMass_in_g / SOLAR_MASS) / (All.UnitTime_in_s / SEC_PER_YEAR);
@@ -312,10 +319,21 @@ double coolsfr::get_starformation_rate(int i, double *xcloud, simparticles *Sp)
 /**
  * Create a star particle from a gas particle
  */
+/**
+ * Create a star particle from a gas particle with additional debugging
+ */
 void coolsfr::create_star_particle(simparticles *Sp, int i, double prob, double rnd, double currentTemp)
 {
   if(rnd < prob)  /* Make a star */
     {
+      // Enhanced debug output
+      if(ThisTask == 0 && All.StarFormationDebugLevel) {
+        double rho = Sp->SphP[i].Density * All.cf_a3inv;
+        double redshift = 1.0/All.Time - 1.0;
+        printf("[SF] Creating star from particle %d at rho=%g, T=%g K, z=%g (prob=%g, rand=%g)\n", 
+               Sp->P[i].ID.get(), rho, currentTemp, redshift, prob, rnd);
+      }
+      
       // CONVERT GAS INTO A STAR
       if(Sp->P[i].getMass() < 1.5 * All.TargetGasMass / GENERATIONS)
         {
@@ -380,17 +398,20 @@ void coolsfr::create_star_particle(simparticles *Sp, int i, double prob, double 
 /**
  * This function handles gas cooling and star formation
  */
+/**
+ * Modified version of cooling_and_starformation to make it more similar to Gadget-3
+ * This includes a more flexible star formation criteria with smoother transitions
+ */
 void coolsfr::cooling_and_starformation(simparticles *Sp)
 {
   TIMER_START(CPU_COOLING_SFR);
   
   All.set_cosmo_factors_for_current_time();
   
-   double sum_sm, total_sm, rate, sum_mass_stars, total_sum_mass_stars; // Variables for accumulating star mass
-   double rate_in_msunperyear; // Star formation rate in solar masses per year
-   double totsfrrate; // Total star formation rate across the simulation
-   double w = 0; // Random number for metallicity update
-   double cum_mass_stars = 0; // Cumulative mass of stars formed
+  double sum_sm = 0, total_sm = 0, rate = 0, sum_mass_stars = 0, total_sum_mass_stars = 0;
+  double rate_in_msunperyear = 0, totsfrrate = 0;
+  double w = 0; // Random number for metallicity update
+  double cum_mass_stars = 0; // Cumulative mass of stars formed
 
   double time_h_a = (All.ComovingIntegrationOn) ? All.Time * All.cf_hubble_a : 1.0;
   double total_sfr = 0;  // Total star formation rate
@@ -399,6 +420,7 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
   gas_state gs = GasState;
   do_cool_data DoCool = DoCoolData;
   
+  // ---------- FIRST LOOP: EVALUATE STAR FORMATION ELIGIBILITY ----------
   for(int i = 0; i < Sp->TimeBinsHydro.NActiveParticles; i++)
     {
       int target = Sp->TimeBinsHydro.ActiveParticleList[i];
@@ -417,15 +439,42 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
           double utherm = Sp->get_utherm_from_entropy(target);
           double rho = Sp->SphP[target].Density * All.cf_a3inv;
           double currentTemp = convert_u_to_temp(utherm, rho, &Sp->SphP[target].Ne, &gs, &DoCool);
-
-          // Standard density-threshold star formation
-          if(currentTemp < All.MaxStarFormationTemp) 
-            {
-              if(rho >= All.PhysDensThresh) {
-                Sp->SphP[target].SfFlag = 1;
-                sf_eligible++;
+          
+          // ---------- GADGET-3 STYLE CRITERIA ----------
+          // Temperature-dependent density threshold - creates a smoother transition
+          // Calculate a redshift-dependent density threshold
+          double redshift = 1.0/All.Time - 1.0;
+          double z_factor = 1.0;
+          
+          // Optionally scale threshold with redshift - smoothly decreases threshold at low-z
+          if(redshift < 2.0) {
+            z_factor = 1.0 - 0.3 * (2.0 - redshift) / 2.0; // Gradual decrease from z=2 to z=0
+            if(z_factor < 0.7) z_factor = 0.7; // Don't reduce too much
+          }
+          
+          // Calculate temperature-dependent threshold
+          double temp_factor = 1.0;
+          if(currentTemp > 0.5 * All.MaxStarFormationTemp) {
+            // Smoothly increase threshold as we approach temperature limit
+            temp_factor = 1.0 + 5.0 * (currentTemp - 0.5 * All.MaxStarFormationTemp) / 
+                         (0.5 * All.MaxStarFormationTemp);
+          }
+          
+          // Compute effective threshold by combining these factors
+          double effective_threshold = All.PhysDensThresh * z_factor * temp_factor;
+          
+          // Standard density-threshold star formation with Gadget-3 style checks
+          if(currentTemp < All.MaxStarFormationTemp) {
+            if(rho >= effective_threshold) {
+              Sp->SphP[target].SfFlag = 1;
+              sf_eligible++;
+              
+              if(ThisTask == 0 && All.StarFormationDebugLevel > 1) {
+                printf("[SF_DEBUG] Particle %d eligible for SF: rho=%g, temp=%g, threshold=%g (z=%g)\n",
+                       Sp->P[target].ID.get(), rho, currentTemp, effective_threshold, redshift);
               }
             }
+          }
             
           // Additional cosmological threshold check
           if(All.ComovingIntegrationOn)
@@ -451,7 +500,22 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
                 Sp->SphP[target].DelayTime = 0;
             }
 #endif
-
+        } // End Type == 0
+    } // End first loop
+  
+  if(ThisTask == 0)
+      mpi_printf("STARFORMATION: %d particles eligible for star formation\n", sf_eligible);
+  
+  // ---------- SECOND LOOP: APPLY COOLING AND STAR FORMATION ----------
+  for(int i = 0; i < Sp->TimeBinsHydro.NActiveParticles; i++)
+    {
+      int target = Sp->TimeBinsHydro.ActiveParticleList[i];
+      if(Sp->P[target].getType() == 0)  // Gas particle
+        {
+          // Get timestep
+          double dt = (Sp->P[target].getTimeBinHydro() ? (((integertime)1) << Sp->P[target].getTimeBinHydro()) : 0) * All.Timebase_interval;
+          double dtime = All.cf_atime * dt / All.cf_atime_hubble_a;
+          
           // Process star-forming particles
           if(Sp->SphP[target].SfFlag == 1)
             {
@@ -465,8 +529,9 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
               // Calculate star formation probability
               double tsfr, factorEVP, egyhot, egyeff, egyold, egycurrent;
               double ne = Sp->SphP[target].Ne;
+              double rho = Sp->SphP[target].Density * All.cf_a3inv;
               
-              // Standard model
+              // Standard model from Gadget-3
               tsfr = sqrt(All.PhysDensThresh / rho) * All.MaxSfrTimescale;
               factorEVP = pow(rho / All.PhysDensThresh, -0.8) * All.FactorEVP;
               egyhot = All.EgySpecSN / (1 + factorEVP) + All.EgySpecCold;
@@ -474,7 +539,7 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
               double cloudmass = xcloud * Sp->P[target].getMass();
               if(tsfr < dtime) tsfr = dtime;
               
-              // Probability of star formation
+              // Probability of star formation - similar to Gadget-3 approach
               double p = (1 - All.FactorSN) * dtime / tsfr * cloudmass / Sp->P[target].getMass();
               double prob;
               
@@ -483,13 +548,13 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
               else
                 prob = Sp->P[target].getMass() / (All.TargetGasMass / GENERATIONS) * (1 - exp(-p));
               
-              // Apply effective equation of state for star-forming gas
+              // Apply effective equation of state for star-forming gas - like Gadget-3
               if(dt > 0)
                 {
                   // Calculate energy from entropy
                   egycurrent = Sp->SphP[target].Entropy * pow(Sp->SphP[target].Density, GAMMA_MINUS1) / GAMMA_MINUS1;
                   
-                  // Calculate relaxation timescale
+                  // Calculate relaxation timescale - similar to Gadget-3
                   double trelax = tsfr * (1 - xcloud) / xcloud / (All.FactorSN * (1 + factorEVP));
                   double relaxfactor = exp(-dtime / trelax);
                   
@@ -508,10 +573,11 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
                 }
               
               // Random number for star formation decision
-              double rnd = get_random_number( Sp->P[target].ID.get() + target + All.NumCurrentTiStep );
+              double rnd = get_random_number(Sp->P[target].ID.get() + target + All.NumCurrentTiStep);
               
               // Create star if probability check passes
-              create_star_particle(Sp, target, prob, rnd, currentTemp);
+              create_star_particle(Sp, target, prob, rnd, convert_u_to_temp(Sp->get_utherm_from_entropy(target), 
+                                  Sp->SphP[target].Density * All.cf_a3inv, &Sp->SphP[target].Ne, &gs, &DoCool));
               
 #ifdef WINDS
               // Handle wind model if particle hasn't been turned into a star
@@ -529,10 +595,6 @@ void coolsfr::cooling_and_starformation(simparticles *Sp)
             }
         }
     }
-  
-  if(ThisTask == 0)
-      mpi_printf("STARFORMATION: %d particles eligible for star formation\n", sf_eligible);
-
 
   log_sfr(Sp);
 
