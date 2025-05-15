@@ -871,9 +871,7 @@ void coolsfr::rearrange_particle_sequence(simparticles *Sp)
 
 void coolsfr::log_sfr(simparticles *Sp)
 {
-  // Only write from the root task
-  if(ThisTask == 0 && Logs.FdSfr)
-  {
+
     // Column 1: Time (scale factor)
     double time = All.Time;
     
@@ -924,9 +922,11 @@ void coolsfr::log_sfr(simparticles *Sp)
     MPI_Reduce(&total_sfr, &global_sfr, 1, MPI_DOUBLE, MPI_SUM, 0, Communicator);
     MPI_Reduce(&total_gas_mass, &global_gas_mass, 1, MPI_DOUBLE, MPI_SUM, 0, Communicator);
     MPI_Reduce(&sfr_count, &global_sfr_count, 1, MPI_INT, MPI_SUM, 0, Communicator);
-
     // Then use global_sfr, global_gas_mass, global_sfr_count in your calculations
 
+      // Only write from the root task
+  if(ThisTask == 0 && Logs.FdSfr)
+  {
     // Write to SFR file
     fprintf(Logs.FdSfr, "%14e %14e %14e %14e %14e %d\n",
             time,               // Column 1: Scale factor
