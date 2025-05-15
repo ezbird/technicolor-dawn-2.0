@@ -18,6 +18,7 @@ snapshots = sorted(glob.glob("../output/snapshot_*.hdf5"))
 for snapfile in snapshots:
     with h5py.File(snapfile, "r") as snap:
         hdr = dict(snap["Header"].attrs)
+        params = dict(snap["Parameters"].attrs)
         a   = hdr["Time"]
 
         # code → physical density conversion
@@ -42,9 +43,9 @@ for snapfile in snapshots:
 
         # 3) overdensity thresh → physical
         #    ρ_b,0 = OmegaBaryon * ρ_crit,0
-        H0_cgs     = hdr["HubbleParam"]*100*1e5 / (1000*UnitLen)  # s^-1
+        H0_cgs     = params["HubbleParam"]*100*1e5 / (1000*UnitLen)  # s^-1
         rho_crit0  = 3*H0_cgs**2/(8*np.pi*G)
-        rho_b0     = hdr["OmegaBaryon"] * rho_crit0
+        rho_b0     = params["OmegaBaryon"] * rho_crit0
         OD        = hdr.get("CritOverDensity", 0.0)
         thr_from_OD = OD * rho_b0 / a**3
 
