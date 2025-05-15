@@ -9,41 +9,41 @@ import argparse
 import os
 
 def main():
-    parser = argparse.ArgumentParser(description='Create a simple Lilly-Madau plot from SFR data')
-    parser.add_argument('sfr_file', help='Gadget sfr.txt file')
-    parser.add_argument('--g3_file', help='Optional Gadget-3 sfr.txt file for comparison', default=None)
-    parser.add_argument('--output', help='Output image filename', default='lilly_madau.png')
-    args = parser.parse_args()
+    #parser = argparse.ArgumentParser(description='Create a simple Lilly-Madau plot from SFR data')
+    #parser.add_argument('sfr_file', help='Gadget sfr.txt file')
+    #parser.add_argument('--g3_file', help='Optional Gadget-3 sfr.txt file for comparison', default=None)
+    #parser.add_argument('--output', help='Output image filename', default='lilly_madau.png')
+    #args = parser.parse_args()
     
     # Check if file exists
     #if not os.path.exists(args.sfr_file):
     #    print(f"Error: File {args.sfr_file} not found!")
     #    return
     
-    args.sfr_file = "../output/sfr.txt"
-    args.g3_file = "~/gadget-3.27/output/sfr.txt"
+    sfr_file = "../output/sfr.txt"
+    g3_file = "~/gadget-3.27/output/sfr.txt"
 
     # Read SFR data - just the necessary columns
     try:
-        data = np.loadtxt(args.sfr_file)
+        data = np.loadtxt(sfr_file)
         scale_factor = data[:, 0]  # First column is scale factor
         sfr = data[:, 2]           # Third column is SFR in Msun/yr
         redshift = 1.0/scale_factor - 1.0  # Convert scale factor to redshift
     except Exception as e:
-        print(f"Error reading {args.sfr_file}: {e}")
+        print(f"Error reading {sfr_file}: {e}")
         return
     
     # Read G3 data if provided
     g3_redshift = None
     g3_sfr = None
-    if args.g3_file and os.path.exists(args.g3_file):
+    if g3_file and os.path.exists(g3_file):
         try:
-            g3_data = np.loadtxt(args.g3_file)
+            g3_data = np.loadtxt(g3_file)
             g3_scale_factor = g3_data[:, 0]
             g3_sfr = g3_data[:, 2]
             g3_redshift = 1.0/g3_scale_factor - 1.0
         except Exception as e:
-            print(f"Error reading {args.g3_file}: {e}")
+            print(f"Error reading {g3_file}: {e}")
     
     # Create plot
     plt.figure(figsize=(10, 6))
