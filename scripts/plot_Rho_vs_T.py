@@ -29,8 +29,11 @@ for snapfile in snapshots:
         UnitVel = 1e5             # cm/s per code velocity unit
 
         # Load gas data
-        rho_code = np.array(snap["PartType0/Density"]) * a**3
-        rho_cgs = rho_code * (UnitMass / UnitLen**3)
+        #rho_code = np.array(snap["PartType0/Density"]) * a**3
+        rho_comov_code = np.array(snap["PartType0/Density"])
+        rho_phys_code  = rho_comov_code  / a**3                  # → code‐unit physical density
+        rho_cgs        = rho_phys_code * (UnitMass/UnitLen**3)   # → physical density in g/cm³
+        #rho_cgs = rho_code * (UnitMass / UnitLen**3)
 
         u_code = np.array(snap["PartType0/InternalEnergy"])
         u_cgs = u_code * UnitVel**2  # erg/g
