@@ -16,12 +16,12 @@ def main():
     args = parser.parse_args()
     
     # Check if file exists
-    if not os.path.exists(args.sfr_file):
-        print(f"Error: File {args.sfr_file} not found!")
-        return
+    #if not os.path.exists(args.sfr_file):
+    #    print(f"Error: File {args.sfr_file} not found!")
+    #    return
     
     args.sfr_file = "../output/sfr.txt"
-    args.g3_file = "~/gadget-3.27output/sfr.txt"
+    args.g3_file = "~/gadget-3.27/output/sfr.txt"
 
     # Read SFR data - just the necessary columns
     try:
