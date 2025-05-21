@@ -112,12 +112,6 @@ LimitExtremeVelocities     1       % Whether to limit extreme particle velocitie
 LimitVelocitiesOnlyForGas  0       % Whether to limit velocities only for gas particles (0=no, 1=yes)
 MaxAllowedVelocity         750.0   % Maximum allowed velocity in code units
 
-% ---- Wind
-WindEfficiency        2.0
-WindEnergyFraction    1.0
-WindFreeTravelLength  20
-WindFreeTravelDensFac 0.1
-
 %----- Star formation
 %MetalYield            0.02
 %MaxSfrTimescale       2.7        % usually 1.5; Gas consumption timescale (multi-phase model)
@@ -130,6 +124,10 @@ WindFreeTravelDensFac 0.1
 %CritPhysDensity       0.0          % critical physical density for star formation (in cm^(-3))
 %PhysDensThresh        0.0        % this gets set at runtime in coolsfr::set_units_sfr(void)
 %TargetGasMass         1.0e5      # Target gas particle mass in code units
+%WindEfficiency        2.0
+%WindEnergyFraction    1.0
+%WindFreeTravelLength  20
+%WindFreeTravelDensFac 0.1
 
 % ------ Feedback
 %FeedbackSNII          1     % Enable Type II supernova feedback (0=off, 1=on)
