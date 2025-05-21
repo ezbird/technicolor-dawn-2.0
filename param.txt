@@ -119,23 +119,22 @@ WindFreeTravelLength  20
 WindFreeTravelDensFac 0.1
 
 %----- Star formation
-%StarformationMode     1
-MetalYield            0.02
-MaxSfrTimescale       2.7        % usually 1.5; Gas consumption timescale (multi-phase model)
-MaxStarFormationTemp  10000      % only form stars where T < 10000 K
-FactorSN              0.193      % beta, mass fraction of massive stars (multi-phase model)
-FactorEVP             1000       % A_0, evaporation parameter (multi-phase model); smaller value means lower pressure support, making it easier for gas to collapse
-TempSupernova         1e8        % T_SN, effective "supernova temperature",sets feedback energy (multi-phase model)
-TempClouds            1000       % temperature of cold clouds (multi-phase model)
-CritOverDensity       0.0 %100       % default is 57.7; overdensity threshold value for cosmological sims; lower value means conditions easier to reach for SF
-CritPhysDensity       0.0          % critical physical density for star formation (in cm^(-3))
-PhysDensThresh        0.0        % this gets set at runtime in coolsfr::set_units_sfr(void)
-TargetGasMass         1.0e5      # Target gas particle mass in code units
+%MetalYield            0.02
+%MaxSfrTimescale       2.7        % usually 1.5; Gas consumption timescale (multi-phase model)
+%MaxStarFormationTemp  10000      % only form stars where T < 10000 K
+%FactorSN              0.193      % beta, mass fraction of massive stars (multi-phase model)
+%FactorEVP             1000       % A_0, evaporation parameter (multi-phase model); smaller value means lower pressure support, making it easier for gas to collapse
+%TempSupernova         1e8        % T_SN, effective "supernova temperature",sets feedback energy (multi-phase model)
+%TempClouds            1000       % temperature of cold clouds (multi-phase model)
+%CritOverDensity       0.0 %100       % default is 57.7; overdensity threshold value for cosmological sims; lower value means conditions easier to reach for SF
+%CritPhysDensity       0.0          % critical physical density for star formation (in cm^(-3))
+%PhysDensThresh        0.0        % this gets set at runtime in coolsfr::set_units_sfr(void)
+%TargetGasMass         1.0e5      # Target gas particle mass in code units
 
 % ------ Feedback
-FeedbackSNII          1     % Enable Type II supernova feedback (0=off, 1=on)
-FeedbackSNIa          1     % Enable Type Ia supernova feedback (0=off, 1=on)
-FeedbackAGB           1     % Enable AGB stellar winds feedback (0=off, 1=on)
+%FeedbackSNII          1     % Enable Type II supernova feedback (0=off, 1=on)
+%FeedbackSNIa          1     % Enable Type Ia supernova feedback (0=off, 1=on)
+%FeedbackAGB           1     % Enable AGB stellar winds feedback (0=off, 1=on)
 
 %----- Debugging
 StarFormationDebugLevel  2     % Prints star formation-related activity (0=none, 1=basic, 2=verbose)   NEED TO DO 1-2
