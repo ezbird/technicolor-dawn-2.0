@@ -33,7 +33,7 @@ extern int CoolingOn;
  */
 struct global_data_all_processes : public parameters
 {
-#if defined(COOLING)
+#ifdef COOLING
   char TreecoolFile[255];
 
   int LimitExtremeVelocities;
