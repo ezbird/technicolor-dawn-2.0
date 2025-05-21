@@ -535,6 +535,48 @@ double coolsfr::AbundanceRatios(double u, double rho, double *ne_guess, double *
   return temp;
 }
 
+
+/**
+ * This function applies cooling to gas particles when COOLING is enabled
+ * but STARFORMATION is disabled.
+ */
+void coolsfr::cooling_only(simparticles *Sp)
+{
+  TIMER_START(CPU_COOLING);
+  
+  // Skip if cooling is disabled
+  if(All.CoolingOn == 0)
+    return;
+  
+  // Set up cosmological factors for current time
+  All.set_cosmo_factors_for_current_time();
+  
+  // Initialize the cooling state structures
+  gas_state gs = GasState;
+  do_cool_data DoCool = DoCoolData;
+  
+  // Loop through active gas particles
+  for(int i = 0; i < Sp->TimeBinsHydro.NActiveParticles; i++)
+  {
+    int target = Sp->TimeBinsHydro.ActiveParticleList[i];
+    if(Sp->P[target].getType() != 0) // Skip non-gas particles
+      continue;
+    
+    // Skip particles that have been swallowed or eliminated
+    if(Sp->P[target].getMass() == 0 && Sp->P[target].ID.get() == 0)
+      continue;
+    
+    // Skip inactive particles
+    if(Sp->P[target].getTimeBinHydro() < 0)
+      continue;
+    
+    // Perform standard cooling
+    cool_sph_particle(Sp, target, &gs, &DoCool);
+  }
+  
+  TIMER_STOP(CPU_COOLING);
+}
+
 /** \brief  Calculate (heating rate-cooling rate)/n_h^2 in cgs units, including dust contribution
  *
  *  \param logT     log10 of gas temperature
