@@ -30,28 +30,51 @@ extern int CoolingOn;
  * convenient for writing/reading the restart file, and it allows the
  * introduction of new global variables in a simple way. The only
  * thing to do is to introduce them into this structure.
+
+ By not including them in the ifdef statements, they are free to exist
+ in the param.txt without commenting them out when we turn on/off modules.
  */
 struct global_data_all_processes : public parameters
 {
 
+  // STAR FORMATION PARAMETERS
+  double CritOverDensity;
+  double CritPhysDensity;
+  double OverDensThresh;
+  double PhysDensThresh;
+  double EgySpecSN;
+  double EgySpecCold;
+  double FactorEVP;
+  double TempSupernova;
+  double TempClouds;
+  double MaxSfrTimescale;
+  double MaxStarFormationTemp;
+  double FactorSN;
+  double TargetGasMass;  // Target mass for gas particles
+  double WindEfficiency;
+  double WindEnergyFraction;
+  double WindFreeTravelLength;
+  double WindFreeTravelDensFac;
+  double MetalYield;
+  int StarFormationDebugLevel;    /* Print detailed diagnostics (0=no, 1=yes) */
+  MyIDType MaxID;
 
+  // FEEDBACK PARAMETERS
+  int FeedbackDebugLevel;         /* Print detailed diagnostics (0=no, 1=yes) */
+  int FeedbackSNII;          /* Enable Type II supernova feedback (0=off, 1=on) */
+  int FeedbackSNIa;          /* Enable Type Ia supernova feedback (0=off, 1=on) */
+  int FeedbackAGB;           /* Enable AGB stellar winds feedback (0=off, 1=on) */
+
+  // COOLING PARAMETERS
   int LimitExtremeVelocities;
   int LimitVelocitiesOnlyForGas;
   double MaxAllowedVelocity;
-
   int CoolingDebugLevel;          /*!< Level of detail for Cooling and UVB debugging output */
-
-#ifdef COOLING
   char TreecoolFile[255];
-
-
-#endif
 
 #ifdef INDIVIDUAL_GRAVITY_SOFTENING
   double AvgType1Mass;
 #endif
-
-
 
   double TopNodeFactor;
 
@@ -330,34 +353,7 @@ struct global_data_all_processes : public parameters
 #endif
 
 #ifdef STARFORMATION /* star formation and feedback sector */
-  double CritOverDensity;
-  double CritPhysDensity;
-  double OverDensThresh;
-  double PhysDensThresh;
-  double EgySpecSN;
-  double EgySpecCold;
-  double FactorEVP;
-  double TempSupernova;
-  double TempClouds;
-  double MaxSfrTimescale;
-  double MaxStarFormationTemp;
-  double FactorSN;
-  double TargetGasMass;  // Target mass for gas particles
-  
-  double WindEfficiency;
-  double WindEnergyFraction;
-  double WindFreeTravelLength;
-  double WindFreeTravelDensFac;
 
-  double MetalYield;
-
-  int FeedbackDebugLevel;         /* Print detailed diagnostics (0=no, 1=yes) */
-  int StarFormationDebugLevel;    /* Print detailed diagnostics (0=no, 1=yes) */
-
-  int FeedbackSNII;          /* Enable Type II supernova feedback (0=off, 1=on) */
-  int FeedbackSNIa;          /* Enable Type Ia supernova feedback (0=off, 1=on) */
-  int FeedbackAGB;           /* Enable AGB stellar winds feedback (0=off, 1=on) */
-  MyIDType MaxID;
 #endif
 
 #ifdef DUST
