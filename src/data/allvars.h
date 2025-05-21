@@ -33,14 +33,18 @@ extern int CoolingOn;
  */
 struct global_data_all_processes : public parameters
 {
-#ifdef COOLING
-  char TreecoolFile[255];
+
 
   int LimitExtremeVelocities;
   int LimitVelocitiesOnlyForGas;
   double MaxAllowedVelocity;
 
   int CoolingDebugLevel;          /*!< Level of detail for Cooling and UVB debugging output */
+
+#ifdef COOLING
+  char TreecoolFile[255];
+
+
 #endif
 
 #ifdef INDIVIDUAL_GRAVITY_SOFTENING
