@@ -131,10 +131,13 @@ int FeedbackFlag; /**< feedback flag for star particles */
 
 #ifdef STARFORMATION
   MyFloat StellarAge;  /**< formation time of star particle */
-  MyFloat Metallicity; /**< metallicity of gas or star particle */
   MyFloat Mass_SNII;
   MyFloat Mass_AGB;
   MyFloat Mass_SNIa;
+#endif
+
+#ifdef COOLING
+  MyFloat Metallicity; /* Total metallicity of the particle */
 #endif
 
 #ifdef FEEDBACK

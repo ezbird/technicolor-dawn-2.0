@@ -100,10 +100,13 @@ struct sph_particle_data : public sph_particle_data_hydrocore
 
 #ifdef STARFORMATION
   MyFloat Metallicity;
-  MyFloat Metals[4];  // to specifically track Z, C, O, Fe
   MyFloat MassMetallicity;
   MyFloat Sfr;
   int SfFlag; /*!< flag to indicate whether the particle is currently forming stars */
+#endif
+
+#ifdef COOLING
+  MyFloat Metals[4]; // to specifically track Z, C, O, Fe
 #endif
 
 
