@@ -542,11 +542,8 @@ double coolsfr::AbundanceRatios(double u, double rho, double *ne_guess, double *
  */
 void coolsfr::cooling_only(simparticles *Sp)
 {
-  TIMER_START(CPU_COOLING);
-  
-  // Skip if cooling is disabled
-  if(All.CoolingOn == 0)
-    return;
+  // Use an existing timer that's already defined
+  //TIMER_START(CPU_COOLINGSFR);  // or whatever similar timer you have
   
   // Set up cosmological factors for current time
   All.set_cosmo_factors_for_current_time();
@@ -574,7 +571,7 @@ void coolsfr::cooling_only(simparticles *Sp)
     cool_sph_particle(Sp, target, &gs, &DoCool);
   }
   
-  TIMER_STOP(CPU_COOLING);
+  //TIMER_STOP(CPU_COOLINGSFR);  // Match the timer you used above
 }
 
 /** \brief  Calculate (heating rate-cooling rate)/n_h^2 in cgs units, including dust contribution
