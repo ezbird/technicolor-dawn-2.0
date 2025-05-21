@@ -137,8 +137,8 @@ WindFreeTravelDensFac 0.1
 %FeedbackAGB           1     % Enable AGB stellar winds feedback (0=off, 1=on)
 
 %----- Debugging
-StarFormationDebugLevel  2     % Prints star formation-related activity (0=none, 1=basic, 2=verbose)   NEED TO DO 1-2
-FeedbackDebugLevel       1     % Prints feedback-related activity (0=none, 1=basic, 2=verbose)    NEED TO DO 1-2
+%StarFormationDebugLevel  2     % Prints star formation-related activity (0=none, 1=basic, 2=verbose)   NEED TO DO 1-2
+%FeedbackDebugLevel       1     % Prints feedback-related activity (0=none, 1=basic, 2=verbose)    NEED TO DO 1-2
 CoolingDebugLevel        0     % Prints Cooling and UVB activity (0=none, 1=basic, 2=verbose)
 
 %----- Dust properties (PartType6)
