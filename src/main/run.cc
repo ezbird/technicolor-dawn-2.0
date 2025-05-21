@@ -251,7 +251,7 @@ void sim::calculate_non_standard_physics_end_of_step(void)
   //CoolSfr.sfr_create_star_particles(&Sp);
   CoolSfr.cooling_and_starformation(&Sp);   // This is the module from Gadget-3, which may be more developed than the basic Gadget-4 SF
 #else
-  CoolSfr.cooling_only(&Sp);
+  coolsfr::cooling_only(&Sp);
 #endif
 
 #endif
