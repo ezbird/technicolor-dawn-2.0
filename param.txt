@@ -95,16 +95,16 @@ SofteningClassOfPartType4    4        ; stars
 SofteningClassOfPartType5    5
 SofteningClassOfPartType6    6        ; dust
 
-GasSoftFactor 1.5
-AdaptiveHydroSofteningSpacing 1.05
-MinimumComovingHydroSoftening 0.1
+%GasSoftFactor 1.5
+%AdaptiveHydroSofteningSpacing 1.05
+%MinimumComovingHydroSoftening 0.1
+%ViscosityAlphaMin            0.1        ; minimum viscosity coefficient
 
 %----- SPH
 ArtBulkViscConst             1.5        ; Higher for better shock handling
 %MinEgySpec                   0.05      ; took this out completely and replaced with MinGasTemp
 MinGasTemp                   50        ; in Kelvin, minimum temperature fas is allowed to get
 InitGasTemp                  462.77046  ; in Kelvin, Sets the initial gas temperature, if not provided in the ICs.
-ViscosityAlphaMin            0.1        ; minimum viscosity coefficient 
 MinGasHsml                   0.1        ; we can get negative smoothing lengths without this lower limit
 
 %---- Velocity Limiter Parameters
