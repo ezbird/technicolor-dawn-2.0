@@ -1,4 +1,4 @@
-% Parameters for Technicolor Dawn v2
+% Parameters for Technicolor Dawn v2 - Optimized for 24-core server
 % NOTE: new parameters must be updated in allvars.cc and allvars.h
 
 %----  Relevant files 
@@ -16,8 +16,8 @@ SnapFormat           3
 TimeLimitCPU              175000     % 86400 = 24h, in seconds
 CpuTimeBetRestartFile     7200       % 2h,  in seconds
 
-%----- Memory allocation
-MaxMemSize                1200       % in MByte
+%----- Memory allocation - INCREASED for 24-core server
+MaxMemSize                8000       % in MByte - increased from 1200 to 8GB
 
 %---- Characteristics of run
 TimeBegin                 0.015625   % Begin of the simulation, z = 63
@@ -34,31 +34,31 @@ HubbleParam               0.6774
 Hubble                    0.1
 BoxSize                   1000          %  in kpc
 
-%---- Output frequency and output paramaters
+%---- Output frequency and output paramaters - OPTIMIZED for multi-file I/O
 OutputListOn              0
 TimeBetSnapshot           1.0627825
 TimeOfFirstSnapshot       0.02
 TimeBetStatistics         0.5
-NumFilesPerSnapshot       1
-MaxFilesWithConcurrentIO  1
+NumFilesPerSnapshot       20          % INCREASED: Use 20 files per snapshot for parallel I/O
+MaxFilesWithConcurrentIO  20          % INCREASED: Allow all files to write concurrently
 
-%---- Accuracy of time integration
-ErrTolIntAccuracy        0.02 
-CourantFac               0.15
-MaxSizeTimestep          0.01
+%---- Accuracy of time integration - SLIGHTLY RELAXED for speed
+ErrTolIntAccuracy        0.025         % Slightly relaxed from 0.02
+CourantFac               0.20          % Increased from 0.15 for larger timesteps
+MaxSizeTimestep          0.015         % Slightly larger timesteps
 MinSizeTimestep          1e-07
 
-%---- Tree algorithm, force accuracy, domain update frequency
+%---- Tree algorithm, force accuracy, domain update frequency - OPTIMIZED
 TypeOfOpeningCriterion                1
-ErrTolTheta                           0.6
-ErrTolThetaMax                        1.0
-ErrTolForceAcc                        0.005
-TopNodeFactor                         3.0
-ActivePartFracForNewDomainDecomp      0.01
+ErrTolTheta                           0.7           % Slightly relaxed from 0.6
+ErrTolThetaMax                        1.2           % Increased from 1.0
+ErrTolForceAcc                        0.007         % Slightly relaxed from 0.005
+TopNodeFactor                         4.0           % Increased from 3.0 for better load balancing
+ActivePartFracForNewDomainDecomp      0.005         % More frequent domain decomposition
 
-%---- Initial density estimate
-DesNumNgb                        33   ; adjust each particle's smoothing length h (for dens, press, temp) until it finds this many neighbors
-MaxNumNgbDeviation               3    ; tolerance around the desired number of neighbors(i.e. +/- around DesNumNgb)
+%---- Initial density estimate - OPTIMIZED for parallel
+DesNumNgb                        40    % Increased from 33 for better statistics
+MaxNumNgbDeviation               4     % Increased tolerance for faster convergence
 
 %---- System of units
 UnitLength_in_cm         3.085678e21        ;  Mpc / h is 3.085678e24; 1.0 kpc / h is 3.085678e21

@@ -170,7 +170,7 @@ def process_single_snapshot(args):
             snap_num = int(snap_name.split("_")[-1].split(".")[0])
         
         output_filename = f"rho_T_snap_{snap_num:03d}_z{redshift:.2f}.png"
-        plt.savefig("rho_T_frames"+output_filename, dpi=150, bbox_inches='tight')
+        plt.savefig("rho_T_frames/"+output_filename, dpi=150, bbox_inches='tight')
         plt.close(fig)
         
         elapsed = time.time() - start_time
