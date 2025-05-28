@@ -17,7 +17,7 @@ TimeLimitCPU              175000     % 86400 = 24h, in seconds
 CpuTimeBetRestartFile     7200       % 2h,  in seconds
 
 %----- Memory allocation - INCREASED for 24-core server
-MaxMemSize                8000       % in MByte - increased from 1200 to 8GB
+MaxMemSize                5000       % in MByte - increased from 1200 to 5GB
 
 %---- Characteristics of run
 TimeBegin                 0.015625   % Begin of the simulation, z = 63
