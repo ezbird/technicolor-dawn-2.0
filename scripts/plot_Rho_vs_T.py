@@ -156,15 +156,28 @@ for snapfile in snapshots:
             label='CritOverDensity→phys'
         )
 
+    # Calculate redshift
+    redshift = 1.0 / a - 1.0
+    
     ax.set_xlabel('log10(Density [g/cm³])')
     ax.set_ylabel('log10(Temperature [K])')
-    ax.set_title(f'ρ–T   {snap_name}   (a={a:.4f})')
+    ax.set_title(f'ρ–T   {snap_name}   (z={redshift:.2f})')
     ax.legend(loc='upper left', fontsize='small')
 
     cbar = plt.colorbar(hist[3], ax=ax)
     cbar.set_label('Gas Count (log scale)')
 
     plt.tight_layout()
-    plt.show()
+    
+    # Save as PNG instead of showing
+    if use_multifile:
+        snap_num = int(os.path.basename(snapfile).split("_")[-1])
+    else:
+        snap_num = int(snap_name.split("_")[-1].split(".")[0])
+    
+    output_filename = f"rho_T_snap_{snap_num:03d}_z{redshift:.2f}.png"
+    plt.savefig(output_filename, dpi=150, bbox_inches='tight')
+    plt.close(fig)
+    print(f"Saved: {output_filename}")
 
 print("Finished processing all snapshots!")
