@@ -51,15 +51,14 @@ SELFGRAVITY                                   # switch to enable self-gravity of
 
 #TREEPM_NOTIMESPLIT                           # if this is activated, long-range and short-range gravity are time-integrated on a common timestep
 #HIERARCHICAL_GRAVITY                         # enables hierarchical time integration of the gravity 
-#FORCE_EQUAL_TIMESTEPS                        # this chooses a global timestep for all particles
+FORCE_EQUAL_TIMESTEPS                        # this chooses a global timestep for all particles
 
 
 #--------------------------------------- Treatment of gravitational softening
 
 #INDIVIDUAL_GRAVITY_SOFTENING=4+8+16+32       # bitmasks which selects the particle type(s) which pick their softening class based on particle mass
 NSOFTCLASSES=7                               # number of different softening classes
-ADAPTIVE_HYDRO_SOFTENING                     # makes SPH gas particles pick an adaptive gravitational softening proportional to their SPH smoothing lengths
-
+###ADAPTIVE_HYDRO_SOFTENING                     # makes SPH gas particles pick an adaptive gravitational softening proportional to their SPH smoothing lengths
 
 #--------------------------------------- SPH treatment and formulation
 
@@ -82,7 +81,7 @@ CUBIC_SPLINE_KERNEL                          # uses the cubic spline kernel (def
 
 #--------------------------------------- SPH viscosity options
 
-TIMEDEP_ART_VISC                             # enables time dependend viscosity (read to include with PRESSURE_ENTROPY_SPH)
+###TIMEDEP_ART_VISC                             # enables time dependend viscosity (read to include with PRESSURE_ENTROPY_SPH)
 #HIGH_ART_VISC_START                          # start with high rather than low viscosity
 #NO_SHEAR_VISCOSITY_LIMITER                   # turns of the shear viscosity supression
 
